@@ -12,7 +12,7 @@
 
 Firebase::Firebase(QObject *parent) : QObject(parent)
 {
-    qInfo()<< "In firebase constructor";
+    qInfo()<< "In firebasde constructor";
     idToken = "";
     refreshToken = "";
     userId = "";

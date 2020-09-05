@@ -12,7 +12,6 @@
 
 Firebase::Firebase(QObject *parent) : QObject(parent)
 {
-    qInfo()<< "In firebasde constructor";
     idToken = "";
     refreshToken = "";
     userId = "";
@@ -20,10 +19,9 @@ Firebase::Firebase(QObject *parent) : QObject(parent)
 
     login_httpWorker = new HttpsWorker();
     refreshLogin_httpWorker= new HttpsWorker();
-    bool login_connected = connect(login_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(loginResults(QVariantMap)));
-    qInfo() << "login slot signal connected: " << login_connected;
-    bool refresh_connected = connect(refreshLogin_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(refreshAuthResults(QVariantMap)));
-    qInfo() << "refreshAuth() signal slot connected: " << refresh_connected;
+    connect(login_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(loginResults(QVariantMap)));
+    connect(refreshLogin_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(refreshAuthResults(QVariantMap)));
+
 }
 
 Firebase::~Firebase()
@@ -34,7 +32,7 @@ Firebase::~Firebase()
 
 void Firebase::login(QString uname, QString password)
 {
-    qInfo() << "in firebase::login";
+
     QString URL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key=AIzaSyDOuF3bf6XnwzKZZoYX7tT_nV4JEI8IyNE";
     QJsonObject jObj;
     jObj.insert("email",QJsonValue::fromVariant(uname));
@@ -53,8 +51,8 @@ void Firebase::loginResults(QVariantMap response)
     refreshToken = response["refreshToken"].toString();
 
     qInfo() << "in Firebase::loginResults";
-    qInfo() << "LOGIN_RESULTS: ID_TOKEN: " << idToken;
-    qInfo() << "LOGIN_RESULTS: REFRESH_TOKEN: " << refreshToken;
+    //qInfo() << "LOGIN_RESULTS: ID_TOKEN: " << idToken;
+    //qInfo() << "LOGIN_RESULTS: REFRESH_TOKEN: " << refreshToken;
 
     bool success = idToken != "" && refreshToken != "";
     qInfo() << "LOGIN_RESULTS: SUCCESS: " << success;
@@ -62,7 +60,6 @@ void Firebase::loginResults(QVariantMap response)
         refreshAuth();
     }
 
-    //delete login_httpWorker;
 }
 
 
@@ -92,23 +89,18 @@ void Firebase::refreshAuthResults(QVariantMap response)
         expiresIn = response["expires_in"].toInt();
 
         qInfo() << "in Firebase::refreshAuthResults";
-        qInfo() << "REFRESH_AUTH_RESHULTS: ID_TOKEN: " << idToken;
-        qInfo() << "REFRESH_AUTH_RESHULTS: REFRESH_TOKEN: " << refreshToken;
-        qInfo() << "REFRESH_AUTH_RESHULTS: EXPIRES_IN: " << expiresIn;
-        qInfo() << "REFRESH_AUTH_RESULTS: USER_ID: " << userId;
+        //qInfo() << "REFRESH_AUTH_RESHULTS: ID_TOKEN: " << idToken;
+        //qInfo() << "REFRESH_AUTH_RESHULTS: REFRESH_TOKEN: " << refreshToken;
+        //qInfo() << "REFRESH_AUTH_RESHULTS: EXPIRES_IN: " << expiresIn;
+        //qInfo() << "REFRESH_AUTH_RESULTS: USER_ID: " << userId;
 
         bool success = idToken != "" && refreshToken != "" && userId != "" && expiresIn != 0;
         qInfo() << "REFRESH_AUTH_RESULTS: SUCCESS: " << success;
         if (success){
             qInfo() << "REFRESH_AUTH_RESULTS: SETTING INTERVAL";
-//            refreshAuthTimer.setInterval(10000);
-//            refreshAuthTimer.setSingleShot(true);
-//            connect(&refreshAuthTimer, &QTimer::timeout, this, &Firebase::refreshAuth);
-//            refreshAuthTimer.start();
-            QTimer::singleShot(10000, this, &Firebase::refreshAuth);
+            QTimer::singleShot((expiresIn-10)*1000, this, &Firebase::refreshAuth);
         }
 
-        //delete refreshLogin_httpWorker;
     } catch (...) {
         qInfo() << "error occured in refreshAuthResults";
     }

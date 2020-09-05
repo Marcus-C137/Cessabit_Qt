@@ -6,11 +6,11 @@
 #include <QDateTime>
 
 
-class logger : public QObject
+class Logger : public QObject
 {
     Q_OBJECT
 public:
-    explicit logger(QObject *parent = nullptr);
+    explicit Logger(QObject *parent = nullptr);
 
     static bool logging;
     static QString filename;

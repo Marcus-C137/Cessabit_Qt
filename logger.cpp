@@ -11,24 +11,24 @@
 
 
 const QtMessageHandler  QT_DEFAULT_MESSAGE_HANDLER = qInstallMessageHandler(nullptr);
-QString logger::filename = QDir::currentPath() + "/log.txt";
-bool logger::logging = false;
+QString Logger::filename = QDir::currentPath() + "/log.txt";
+bool Logger::logging = false;
 
-logger::logger(QObject *parent) : QObject(parent)
+Logger::Logger(QObject *parent) : QObject(parent)
 {
 
 
 }
 
-void logger::attach()
+void Logger::attach()
 {
-    logger::logging = true;
-    qInstallMessageHandler(logger::lhandler);
+    Logger::logging = true;
+    qInstallMessageHandler(Logger::lhandler);
 }
 
-void logger::lhandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+void Logger::lhandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
-    if(logger::logging){
+    if(Logger::logging){
         QString txt;
         switch(type){
         case QtInfoMsg:
@@ -48,7 +48,7 @@ void logger::lhandler(QtMsgType type, const QMessageLogContext &context, const Q
             break;
         }
 
-        QFile file(logger::filename);
+        QFile file(Logger::filename);
         if(file.open(QIODevice::WriteOnly | QIODevice::Append)){
             QTextStream ts(&file);
             ts << QDateTime::currentDateTime().toString() << " - " << txt << " file: " << context.file << " line: " << context.line << endl;

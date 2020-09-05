@@ -1,4 +1,5 @@
 QT += quick
+QT += sql charts
 
 CONFIG += c++11
 
@@ -15,8 +16,10 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
         arduinocoms.cpp \
+        chartdata.cpp \
         firebase.cpp \
         httpsworker.cpp \
+        localdb.cpp \
         logger.cpp \
         main.cpp \
         wifimanager.cpp
@@ -37,8 +40,10 @@ target.path = /home/pi/Qt
 
 HEADERS += \
     arduinocoms.h \
+    chartdata.h \
     firebase.h \
     httpsworker.h \
+    localdb.h \
     logger.h \
     wifimanager.h
 

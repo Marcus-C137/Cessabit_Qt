@@ -1,6 +1,19 @@
 import QtQuick 2.12
 import QtQuick.Controls 2.5
+import QtQuick.Controls.Styles 1.4
+
 Page {
+
+    Connections{
+        target: arduinoComms
+        onTempUpdate:{
+            console.log("In on Temp update")
+            port1_txt.text = temps[0].toFixed(1);
+            port2_txt.text = temps[1].toFixed(1);
+            port3_txt.text = temps[2].toFixed(1);
+            port4_txt.text = temps[3].toFixed(1);
+        }
+    }
 
     ///////HEADER/////////////
     Rectangle{
@@ -78,13 +91,10 @@ Page {
                     padding: 20
                 }
 
-
                 width: parent.width
                 onClicked: {
-
-                    pageLoader.source = "connectivity.qml"
-                    pageLoader.focus = true
-                    //drawer.close()
+                    drawer.close()
+                    stack.push("connectivity.qml")
                 }
 
             }
@@ -99,8 +109,8 @@ Page {
 
                 width: parent.width
                 onClicked: {
-                    homeStackView.push("account.qml")
                     drawer.close()
+                    stack.push("account.qml")
                 }
             }
 
@@ -113,8 +123,8 @@ Page {
                 }
                 width: parent.width
                 onClicked: {
-                    homeStackView.push("Settings.qml")
                     drawer.close()
+                    stack.push("Settings.qml")
                 }
             }
         }
@@ -142,7 +152,8 @@ Page {
         height: (parent.height - header.height)/2
         color: "black"
         Text{
-            text: qsTr("96.5")
+            id: port1_txt
+            text: "Load..."
             color: "white"
             font.pointSize: 32
             anchors.centerIn: parent
@@ -150,8 +161,7 @@ Page {
         TapHandler{
             id: tap_port1
             onTapped: {
-                console.log("tapped");
-                pageLoader.source = "port.qml";
+                stack.push("port.qml")
             }
         }
     }
@@ -164,7 +174,8 @@ Page {
         height: (parent.height - header.height)/2
         color: "black"
         Text{
-            text: qsTr("92.3")
+            id: port2_txt
+            text: "Load..."
             color: "white"
             font.pointSize: 32
             anchors.centerIn: parent
@@ -173,8 +184,7 @@ Page {
         TapHandler{
             id: tap_port2
             onTapped: {
-                console.log("tapped")
-                pageLoader.source = "port.qml";
+                stack.push("port.qml")
             }
         }
     }
@@ -187,7 +197,8 @@ Page {
         height: (parent.height - header.height)/2
         color: "black"
         Text{
-            text: qsTr("91.5")
+            id: port3_txt
+            text: "Load..."
             color: "white"
             font.pointSize: 32
             anchors.centerIn: parent
@@ -195,8 +206,7 @@ Page {
         TapHandler{
             id: tap_port3
             onTapped: {
-                console.log("tapped")
-                pageLoader.source = "port.qml";
+                stack.push("port.qml")
             }
         }
     }
@@ -208,7 +218,8 @@ Page {
         height: (parent.height - header.height)/2
         color: "black"
         Text{
-            text: qsTr("87.0")
+            id: port4_txt
+            text: "Load..."
             color: "white"
             font.pointSize: 32
             anchors.centerIn: parent
@@ -216,8 +227,7 @@ Page {
         TapHandler{
             id: tap_port4
             onTapped: {
-                console.log("tapped")
-                pageLoader.source = "port.qml";
+                stack.push("port.qml")
             }
         }
     }

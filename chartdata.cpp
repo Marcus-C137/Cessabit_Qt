@@ -1,5 +1,6 @@
 #include "chartdata.h"
 #include "localdb.h"
+#include "singleton.h"
 #include <QtQuick>
 #include <QVariant>
 
@@ -7,16 +8,16 @@
 
 ChartData::ChartData(QObject *parent) : QObject(parent)
 {    
-    connect(&Localdb::Get(), &Localdb::newTempReading, this, &ChartData::newTempRecieved);
+    connect(&Singleton<Localdb>::GetInstance(), &Localdb::newTempReading, this, &ChartData::newTempRecieved);
 }
 
 void ChartData::port1BtnPressed(){
-    QVector<dbVal> queryVals = Localdb::Get().getTemps(1,10);
+    QVector<dbVal> queryVals = Singleton<Localdb>::GetInstance().getTemps(1,6);
     QVariantList times;
     QVariantList temps;
     for(dbVal v: queryVals){
-        qInfo() << "CHARTDATA: port1BtnPressed: val.temp = " << v.temp;
-        qInfo() << "CHARTDATA: port1BtnPressed: val.time = " << v.time;
+        //qInfo() << "CHARTDATA: port1BtnPressed: val.temp = " << v.temp;
+        //qInfo() << "CHARTDATA: port1BtnPressed: val.time = " << v.time;
         QDateTime time;
         time.setSecsSinceEpoch(v.time);
         times.append(time);
@@ -49,6 +50,7 @@ void ChartData::newTempRecieved(int port, QDateTime time, float temp)
         case 1:
            // qInfo() << "CHARTDATA: newTempRecieved: in case port1:";
             emit portDataAdd(time, temp);
+            //qInfo() << "CHARTDATA: emmited portDataAdd, time = " << time << " temp = " << temp;
             break;
     }
 

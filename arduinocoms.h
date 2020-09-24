@@ -13,15 +13,18 @@ public:
 
 public slots:
     void getTemps();
-    void startTimer();
+    void setTemps();
+    //void startTimer();
 
 signals:
+    void tempUpdate(QVariantList temps);
 
 private:
-    QTimer getTempsTimer;
-    QThread AC_workerThread;
+    QTimer *getTempsTimer;
+    QTimer *setTempsTimer;
     int fd;
-
+    float setTempers[4] = {79.9, 80.0, 80.1, 80.2};
+    int file_i2c;
 };
 
 #endif // ARDUINOCOMS_H

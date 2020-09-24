@@ -1,5 +1,6 @@
 import QtQuick 2.12
 import QtQuick.Controls 2.5
+import QtQuick.Controls.Styles 1.4
 
 ApplicationWindow {
     id: window
@@ -7,10 +8,10 @@ ApplicationWindow {
     width: 640
     height: 480
 
-    Loader {
+    StackView {
 
-        id: pageLoader
-        source: "Home.qml"
+        id: stack
+        initialItem: "Home.qml"
         anchors.fill: parent
 
     }

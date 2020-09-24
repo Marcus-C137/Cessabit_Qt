@@ -4,73 +4,98 @@ import QtCharts 2.3
 
 Page {
     id: port
+    visible: true
+    background: Rectangle{
+        anchors.fill: parent
+        color: "black"
+    }
+
     Component.onCompleted: {
+        console.log("Port.qml loaded");
         chartDataObj.port1BtnPressed();
     }
 
-    Rectangle {
-        id: rec_port1
+    Button {
+        id: toolButton
+
+        contentItem: Text {
+            /// \u25C0 = back
+            /// \u2630 = hamburger
+            text: "\u25C0"
+            color: "white"
+            font.pointSize: 24
+
+        }
+
+        onClicked: {
+            stack.pop()
+        }
+
+        background: Rectangle{
+            anchors.fill: parent
+            color: "black"
+        }
+        anchors.leftMargin: 20
         anchors.left: parent.left
         anchors.top: parent.top
-        width: 50
-        height: 50
-        color: "black"
-        Text{
-            text: qsTr("96.5")
-            color: "white"
-            font.pointSize: 32
-            anchors.centerIn: parent
-        }
-        TapHandler{
-            id: tap_port1
-            onTapped: {
-                console.log("tapped");
-                homeStackView.replace("Home.qml");
-            }
-        }
+        anchors.topMargin: 20
+
+
     }
+
+
 
     Connections{
         target: chartDataObj
         onPortRefreshData: {
             dataSeries.clear();
             var timePrint = [];
+            var min = 90;
+            var max = 80;
             console.log("IN ON PORT REFRESH RATE")
             console.log("times.length = " + times.length)
-            console.log("time is of type " +  typeof times)
+
             for (var i=0; i < times.length; i++){
                 console.log("i = " + i);
-                dataSeries.append(i, temps[i])
                 var jsDate = new Date(times[i].getTime());
-                var hour = jsDate.getHours();
-                var minute = jsDate.getMinutes();
-                var seconds = jsDate.getSeconds();
-                var hrMn = hour + ":" + minute + ":" + seconds;
-                timePrint[i] = hrMn;
-                console.log("DataSeries: " + dataSeries.at(0))
-
+                timePrint[i] = Qt.formatTime(jsDate, 'hh:mm:ss AP')
+                dataSeries.append(i, temps[i])
+                console.log("DataSeries: " + dataSeries.at(i))
+                if (temps[i] < min) min = temps[i]
+                if (temps[i] > max) max = temps[i]
             }
+
+            vAxisY.min = min - 10
+            vAxisY.max = max + 10
 
             bAxisX.categories = timePrint
-            //line.createSeries(ChartView.SeriesTypeLine, "nothing", dtAxisX, vAxisY);
         }
         onPortDataAdd:{
-            console.log("In port Data Add")
-            console.log("time = " + time);
-            console.log("temp = " + temp);
-            var jsDate = new Date(time.getTime());
-            var hour = jsDate.getHours();
-            var minute = jsDate.getMinutes();
-            var seconds = jsDate.getSeconds();
-            var hrMn = hour + ":" + minute + ":" + seconds;
-            dataSeries.append(dataSeries.count, temp)
-            var categories = [];
-            for(var i = 0; i < bAxisX.categories.length - 1 ; i++){
-                categories[i] = bAxisX.categories[i+1];
-            }
-            categories.push(hrMn);
+            //console.log("In port Data Add")
+            //console.log("time = " + time);
+            //console.log("temp = " + temp);
 
+            var min = 90;
+            var max = 80;
+            for(var j = 0; j<dataSeries.count; j++){
+                if (min < dataSeries.at(j).y) min = dataSeries.at(j).y
+                if (max > dataSeries.at(j).y) max = dataSeries.at(j).y
+                console.log("Data series of " + j + " = " + dataSeries.at(j))
+                if(j !== dataSeries.count-1) dataSeries.at(j).y = dataSeries.at(j+1).y
+            }
+            dataSeries.at(dataSeries.count-1).y = temp;
+
+            var jsDate = new Date(time.getTime());
+            var timePrint = Qt.formatTime(jsDate, 'hh:mm:ss AP')
+            var categories = [];
+            for(var i = 0; i < bAxisX.categories.length; i++){
+                categories[i] = bAxisX.categories[i];
+            }
+            categories.shift();
+            categories.push(timePrint);
             bAxisX.categories = categories
+            console.log("Data Series length = " + dataSeries.count)
+
 
         }
     }
@@ -90,8 +115,8 @@ Page {
 
         ValueAxis {
             id: vAxisY
-            min: -200
-            max: -190
+            min: 70
+            max: 100
             gridVisible: false
             color: "#ffffff"
             labelsColor: "#ffffff"

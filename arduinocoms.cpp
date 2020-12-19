@@ -5,6 +5,8 @@
 #include <fcntl.h>				//Needed for I2C port
 #include <sys/ioctl.h>			//Needed for I2C port
 #include <linux/i2c-dev.h>		//Needed for I2C port
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <QTimer>
 #include <QDebug>
 #include <QThread>
@@ -19,7 +21,6 @@ ArduinoComs::ArduinoComs(QObject *parent) : QObject(parent)
     char *filename = (char*)"/dev/i2c-1";
     if ((file_i2c = open(filename, O_RDWR)) < 0)
     {
-        //ERROR HANDLING: you can check errno to see what went wrong
         qInfo() << "Failed to open the i2c bus";
         return;
     }
@@ -27,16 +28,21 @@ ArduinoComs::ArduinoComs(QObject *parent) : QObject(parent)
     if (ioctl(file_i2c, I2C_SLAVE, addr) < 0)
     {
         qInfo() << "Failed to acquire bus access and/or talk to slave.\n";
-        //ERROR HANDLING; you can check errno to see what went wrong
+        return;
+    }
+
+    //------SAFETY GPIO ----------
+    char *filenameGPIO = (char*)"/sys/class/gpio/export";
+    if((file_gpio = open(filenameGPIO, O_WRONLY)) < 0)
+    {
+        qInfo() << "Failed to open GPIO";
         return;
     }
     getTempsTimer = new QTimer(this);
-    setTempsTimer = new QTimer(this);
     connect(getTempsTimer, SIGNAL(timeout()), this, SLOT(getTemps()));
-    connect(setTempsTimer, SIGNAL(timeout()), this, SLOT(setTemps()));
     getTempsTimer->start(10000);
-    setTempsTimer->start(15000);
-
+    connect(&Singleton<Localdb>::GetInstance(), &Localdb::newAlarmTemp , this, &ArduinoComs::setTemps);
+    loadTemps(Singleton<Localdb>::GetInstance().setAlms);
 }
 
 
@@ -44,7 +50,7 @@ void ArduinoComs::getTemps()
 {
 
     //wiringPiI2CRead(fd);
-    int dataLength = 8;
+    int dataLength = 16;
     char buff[dataLength];
     //----- READ BYTES -----
     if (read(file_i2c, buff, dataLength) != dataLength)		//read() returns the number of bytes actually read, if it doesn't match then an error occurred (e.g. no response from the device)
@@ -55,51 +61,84 @@ void ArduinoComs::getTemps()
     else
     {
         int16_t currentTempsBuff[4] = {0};
-        float currentTemps[4] = {0.0};
+        int16_t powerPercentageBuff[4] = {0};
+        qreal currentTemps[4] = {0.0};
+        qreal powerPercentage[4] = {0.0};
         QVariantList tempsToDisplay;
+        QVariantList powerToDisplay;
+        QVariantList tempAndPower;
         for(int i= 0; i < 4; i++){
              int highBytePos = i*2;
              int lowBytePos = (i*2) + 1;
              currentTempsBuff[i] = (int16_t)((buff[highBytePos] << 8) | buff[lowBytePos]);
-             currentTemps[i] = (float)currentTempsBuff[i]/10;
+             currentTemps[i] = (qreal)currentTempsBuff[i]/10;
              tempsToDisplay.append(currentTemps[i]);
              //qInfo() << "ARDUINO_COMS: i2c currentTemps response of : " << i << " : " << currentTemps[i];
+             //qInfo() << Q_FUNC_INFO << "buff[highBytePos]: " << (int)buff[highBytePos];
+             //qInfo() << Q_FUNC_INFO << "buff[lowBytePos]: " << (int)buff[lowBytePos];
              //qInfo() << "ARDUINO_COMS: i2c tempsToDisplay of : " << i << " : " << tempsToDisplay[i];
-             QMetaObject::invokeMethod(&Singleton<Localdb>::GetInstance(), "addTempReading", Qt::AutoConnection, Q_ARG(int, i+1), Q_ARG(float, currentTemps[i]));
-
         }
+
+        for(int i= 4; i < 8; i++){
+             int highBytePos = i*2;
+             int lowBytePos = (i*2) + 1;
+             powerPercentageBuff[i-4] = (int16_t)((buff[highBytePos] << 8) | buff[lowBytePos]);
+             powerPercentage[i-4] = qFabs((qreal)(powerPercentageBuff[i-4]-512)/512);
+             powerToDisplay.append(powerPercentage[i-4]);
+             //qInfo() << "ARDUINO_COMS: i2c powerResponse response of : " << i-4 << " : " << powerPercentage[i-4];
+             //qInfo() << Q_FUNC_INFO << "buff[highBytePos]: " << (int)buff[highBytePos];
+             //qInfo() << Q_FUNC_INFO << "buff[lowBytePos]: " << (int)buff[lowBytePos];
+        }
+
+        for (int i = 0; i < 4; i++){
+            QMetaObject::invokeMethod(&Singleton<Localdb>::GetInstance(), "addReading", Qt::AutoConnection, Q_ARG(int, i+1), Q_ARG(qreal, currentTemps[i]), Q_ARG(qreal, powerPercentage[i]));
+        }
+        tempAndPower = tempsToDisplay + powerToDisplay;
+        tempsToDisplay.append(powerToDisplay);
         emit tempUpdate(tempsToDisplay);
-
+        emit powerUpdate(powerToDisplay);
+        emit firebaseUpdate(tempAndPower);
     }
-
-
 }
 
-void ArduinoComs::setTemps()
+void ArduinoComs::setTemps(int port, int alarmLabel, qreal val)
 {
-    int dataLength = 9;
-    char buff[dataLength];
-    buff[0] = 0x00; //change set Temps command
-
-    for (int i = 0; i< 4; i++){
-        setTempers[i] += 0.1;
-        int16_t setTempI = (int16_t) (setTempers[i] * 10);
+    qInfo() << Q_FUNC_INFO;
+    if(alarmLabel == 0){
+        int dataLength = 3;
+        char buff[dataLength];
+        switch(port){
+        case 1:
+            buff[0] = {0x00};
+        case 2:
+            buff[0] = {0x01};
+        case 3:
+            buff[0] = {0x02};
+        case 4:
+            buff[0] = {0x03};
+        }
+        int16_t setTempI = (int16_t) (val *10);
         //qInfo() << "ARDUINO COMMS: setTemps() - setTempsI = " << setTempI;
-        buff[i*2 + 1] = (setTempI >> 8) & 0xff;
-        buff[i*2 + 2] = setTempI & 0xff;
-//        qInfo() << "ARDUINO COMMS: setTemps() - buff[i*2] = " <<  QString::number(buff[i*2], 16);
-//        qInfo() << "ARDUINO COMMS: setTemps() - buff[i*2 +1] = " <<  QString::number(buff[i*2+1], 16);
+        buff[1] = (setTempI >> 8) & 0xff;
+        buff[2] = setTempI & 0xff;
+        qInfo() << "ARDUINO COMMS: setTemps() - buff[0] = " <<  QString::number(buff[0], 16);
+        qInfo() << "ARDUINO COMMS: setTemps() - buff[1] = " <<  QString::number(buff[1], 16);
+        qInfo() << "ARDUINO COMMS: setTemps() - buff[2] = " <<  QString::number(buff[2], 16);
 
+        if (write(file_i2c, buff, dataLength) != dataLength)		//write() returns the number of bytes actually written, if it doesn't match then an error occurred (e.g. no response from the device)
+        {
+            /* ERROR HANDLING: i2c transaction failed */
+            qInfo() << "Failed to write to the i2c bus";
+        }
     }
+}
 
-    if (write(file_i2c, buff, dataLength) != dataLength)		//write() returns the number of bytes actually written, if it doesn't match then an error occurred (e.g. no response from the device)
-    {
-        /* ERROR HANDLING: i2c transaction failed */
-        qInfo() << "Failed to write to the i2c bus";
+void ArduinoComs::loadTemps(QVector<QVector<qreal> > setAlms)
+{
+    for (int i = 0; i < 4; i++){
+        qreal temp = setAlms[i][0];
+        setTemps(i, 0, temp);
     }
-
-    //write(fd, buff, dataLength);
-
 }
 
 

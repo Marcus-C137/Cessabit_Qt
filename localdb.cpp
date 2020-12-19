@@ -1,3 +1,4 @@
+#include <QtMath>
 #include <QtSql>
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -9,7 +10,8 @@
 #include <QTimer>
 #include "localdb.h"
 
-
+QStringList tempLabel = {"Set", "High", "Low"};
+QStringList portLabel = {"1", "2", "3", "4"};
 
 
 Localdb::Localdb(QObject *parent) : QObject(parent)
@@ -43,6 +45,13 @@ Localdb::Localdb(QObject *parent) : QObject(parent)
 //    cleanDBbyHour->start(2*60*60*1000);
 //    cleanDBbyDay->start(2*24*60*60*1000);
 //    cleanDBbyMonth->start(2*24*60*60*1000+2000);
+    dbCounter = 0;
+    setAlms.resize(4);
+    setAlms[0].resize(4);
+    setAlms[1].resize(4);
+    setAlms[2].resize(4);
+    setAlms[3].resize(4);
+
 }
 
 Localdb::~Localdb()
@@ -54,6 +63,13 @@ void Localdb::startTimer(){
     cleanDBbyMin->start(10000);
 }
 
+void Localdb::loadAlarmTemps()
+{
+    for(int i=0; i<4; i++){
+        getAlarmTemps(i+1);
+    }
+}
+
 void Localdb::checkDBs()
 {
     QSqlQuery query(sql_db);
@@ -61,8 +77,10 @@ void Localdb::checkDBs()
     QStringList tables = {"port1_min", "port1_hour", "port1_day", "port1_month",
                           "port2_min", "port2_hour", "port2_day", "port2_month",
                           "port3_min", "port3_hour", "port3_day", "port3_month",
-                          "port4_min", "port4_hour", "port4_day", "port4_month"};
-    QString params = "(time DATETIME, temp REAL)";
+                          "port4_min", "port4_hour", "port4_day", "port4_month",
+                         };
+    QString params = "(time DATETIME, temp REAL, power REAL)";
+
     for (int i=0; i< tables.length(); i++){
         QString command = commandPre + tables[i] + params;
         if (!query.exec(command)){
@@ -70,10 +88,101 @@ void Localdb::checkDBs()
         }
     }
 
+    params = "(uname TEXT, password TEXT)";
+    if(!query.exec(commandPre + "userAccount" + params)){
+        qWarning() <<  Q_FUNC_INFO << "Could not make table userAccount";
+    }
+
+    params = "(uname TEXT, password TEXT)";
+    if(!query.exec(commandPre + "userAccount" + params)){
+        qWarning() <<  Q_FUNC_INFO << "Could not make table userAccount";
+    }
+
+    params = "(port INT, setAlarm TEXT, val REAL)";
+    if(!query.exec(commandPre + "setAlarmTemps" + params)){
+        qWarning() << Q_FUNC_INFO << "Could not make table setAlarmTemps";
+    }
+    //Fill set alarm table
+    commandPre= "INSERT INTO setAlarmTemps(port,setAlarm) ";
+    for (int i=0; i < 12; i++){
+        QString command = commandPre + "SELECT " + portLabel[qFloor(i/3)] +",\"" + tempLabel[i%3] + "\" "
+                                      "WHERE NOT EXISTS("
+                                      "SELECT 1 "
+                                      "FROM setAlarmTemps "
+                                      "WHERE port = " + portLabel[qFloor((i/3))] + " AND setAlarm=\""+ tempLabel[i%3] + "\");" ;
+
+        if(!query.exec(command)){
+            qWarning() << Q_FUNC_INFO << "Could not fill table setAlarmTemps";
+        };
+    }
+}
+
+QStringList Localdb::checkUserAccount()
+{
+    QSqlQuery query;
+    QStringList accountInfo = {"", ""};
+    if(!query.exec("SELECT * FROM userAccount")){
+        qWarning() << Q_FUNC_INFO << query.lastError().text();
+        return accountInfo;
+    }
+    if(!query.first()){
+        qInfo() << Q_FUNC_INFO <<  "NO QUERY FIRST";
+        return accountInfo;
+    }
+    qInfo() << "QUERY FIRST RESULTS" << query.value(0).toString();
+    accountInfo[0] = query.value(0).toString();
+    accountInfo[1] = query.value(1).toString();
+    return accountInfo;
+}
+
+void Localdb::addUserInfo(QString uname, QString password)
+{
+    QSqlQuery query;
+    QString command = "REPLACE INTO userAccount(rowid, uname, password) VALUES(1,\"" + uname + "\", \"" +password + "\");" ;
+    query.prepare(command);
+    if (!query.exec()) qWarning() << "ERROR: " << query.lastError().text();
+    qInfo() << "LOCALDB: addUserInfo()" << uname << " " << password;
+}
+
+void Localdb::changeAlarmTemp(int port, int alarmLabel, qreal val)
+{
+    QSqlQuery query;
+    QString command= "UPDATE setAlarmTemps SET val=" + QString::number(val) + " WHERE port=" + QString::number(port) + " AND setAlarm=\"" + tempLabel[alarmLabel] + "\";" ;
+    setAlms[port-1][alarmLabel] = val;
+    qInfo() << command;
+    if(!query.exec(command)){
+        qWarning() << Q_FUNC_INFO << "Could not fill table setAlarmTemps";
+    };
+    emit newAlarmTemp(port, alarmLabel, val);
+    emit newAlarmTempFirebase(alarmLabel);
 }
 
 
-void Localdb::addTempReading(int port, float temp)
+QList<qreal> Localdb::getAlarmTemps(int port)
+{
+    QList<qreal> temps;
+    QSqlQuery query;
+    QString command= "SELECT * FROM setAlarmTemps WHERE port=" + QString::number(port) +";";
+    qInfo() << command;
+    if(!query.exec(command)){
+        qWarning() << Q_FUNC_INFO << "Could not open setAlarmTemps";
+    };
+    if(!query.first()){
+        //Log error if no query first
+    }
+    for(int i =0; i<3; i++){
+        qreal temp = query.value(2).toReal();
+        //qInfo() << Q_FUNC_INFO << query.value(2).toReal();
+        setAlms[port-1][i] = temp;
+        temps.append(temp);
+        query.next();
+    }
+    qInfo() << Q_FUNC_INFO << "setAlms " << setAlms;
+    return temps;
+}
+
+
+void Localdb::addReading(int port, qreal temp, qreal power)
 {
     // Time zone map
     // Eastern - America/New_York 5h
@@ -81,26 +190,42 @@ void Localdb::addTempReading(int port, float temp)
     // Mountain - America/Mexico_City 7h
     // Pacific - America/Los_Angeles 8h
 
-    // ADD TO DB
-    QSqlQuery query;
     QDateTime time(QDateTime::currentDateTime());
-    qint64 time_sec = time.toSecsSinceEpoch();
-    //qInfo() << "LOCALDB: current time, secs since epoch = " << time.toString();
-    QString command = "INSERT INTO port" + QString::number(port) + "_min " + "VALUES " + "(" + QString::number(time_sec) + "," + QString::number(temp) + ");";
-    //qInfo() << "LOCALDB: command = " << command;
-    query.prepare(command);
-    if (!query.exec()) qWarning() << "ERROR: " << query.lastError().text();
-    //qInfo() << "LOCALDB: addTempReading(): added";
-
-    emit newTempReading(port, time, temp);
+    storeTempToDB("_min", port, temp, power);
+    emit newTempReading("_min", port, time, temp, power);
+    if (dbCounter == 60){
+        storeTempToDB("_hour", port, temp, power);
+        emit newTempReading("_hour", port, time, temp, power);
+    }
+    if (dbCounter == 1440){
+        storeTempToDB("_day", port, temp, power);
+        emit newTempReading("_day", port, time, temp, power);
+    }
+    if (dbCounter == 43200){
+        storeTempToDB("_month", port, temp, power);
+        emit newTempReading("_month", port, time, temp, power);
+        dbCounter = 0;
+    }
+    dbCounter++;
 }
 
+void Localdb::storeTempToDB(QString db, int port, qreal temp, qreal power){
+    QSqlQuery query;
+    QDateTime time(QDateTime::currentDateTime());
+    qint64 time_sec = time.toSecsSinceEpoch(); //qInfo() << "LOCALDB: current time, secs since epoch = " << time.toString();
+    QString command = "INSERT INTO port" + QString::number(port) + db + " VALUES " + "(" + QString::number(time_sec) + "," + QString::number(temp) + "," + QString::number(power) + ");";
+    query.prepare(command);
+    if (!query.exec()){
+        qWarning() << "LOCALDB: command = " << command;
+        qWarning() << "ERROR: " << query.lastError().text(); //qInfo() << "LOCALDB: addTempReading(): added";
+    }
+}
 
-QVector<dbVal> Localdb::getTemps(int port, int count){
+QVector<dbVal> Localdb::getTemps(QString db, int port, int count){
 
     QVector<dbVal> timeTempsVec;
     QSqlQuery query;
-    query.prepare("SELECT * FROM (SELECT * FROM port" + QString::number(port) + " ORDER BY time DESC LIMIT " + QString::number(count) + ") ORDER BY time ASC");
+    query.prepare("SELECT * FROM (SELECT * FROM port" + QString::number(port) + db  + " ORDER BY time DESC LIMIT " + QString::number(count) + ") ORDER BY time ASC");
     if (!query.exec())
         qWarning() << "ERROR: " << query.lastError().text();
     if(query.first()){
@@ -122,7 +247,6 @@ QVector<dbVal> Localdb::getTemps(int port, int count){
     return timeTempsVec;
 
 }
-
 
 void Localdb::cleanDB_Min()
 {

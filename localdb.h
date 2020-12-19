@@ -26,6 +26,7 @@ private:
 //    QTimer *cleanDBbyHour;
 //    QTimer *cleanDBbyDay;
 //    QTimer *cleanDBbyMonth;
+    unsigned long int dbCounter; //1 - _min, 60 - _hour, 1440 - _day, 43200 - _month
 
 
 
@@ -34,17 +35,23 @@ public:
     ~Localdb();
     void connectDB();
     void checkDBs();
-    bool testPlugin();
+    void addUserInfo(QString uname, QString password);
+    void changeAlarmTemp(int port, int alarmLabel, qreal val);
+    void loadAlarmTemps();
     static void initializeDB();
-
-    QVector<dbVal> getTemps(int port, int count);
+    bool testPlugin();
+    QStringList checkUserAccount();
+    QList<qreal> getAlarmTemps(int port);
+    QVector<dbVal> getTemps(QString db, int port, int count);
     QSqlDatabase sql_db;
     QThread DB_workerThread;
     QTimer *cleanDBbyMin;
+    QVector<QVector<qreal>> setAlms;
 
 
 public slots:
-   void addTempReading(int port, float temp);
+   void addReading(int port, qreal temp, qreal power);
+   void storeTempToDB(QString db, int port, qreal temp, qreal power);
    void cleanDB_Min();
    void cleanDB_Hour();
    void cleanDB_Day();
@@ -53,7 +60,9 @@ public slots:
 
 
 signals:
-    void newTempReading(int port, QDateTime time, float temp);
+    void newTempReading(QString db, int port, QDateTime time, qreal temp, qreal power);
+    void newAlarmTemp(int port, int alarmLabel, qreal val);
+    void newAlarmTempFirebase(int alarmLabel);
 
 };
 

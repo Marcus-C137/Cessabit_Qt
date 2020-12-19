@@ -17,51 +17,99 @@ HttpsWorker::HttpsWorker(QObject *parent) : QObject(parent)
    emit requestFinished(responseMap);
 }
 
-void HttpsWorker::get(QString location)
+void HttpsWorker::get(QString URL, QVariantMap params, QVariantMap header, QVariantMap body)
 {
-    Q_UNUSED(location);
+    httpRequest _request = makeRequest(URL, params, header, body);
+    QNetworkReply* reply = manager.get(_request.request);
+    connect(reply, &QNetworkReply::readyRead, this, &HttpsWorker::readyRead);
+}
+
+void HttpsWorker::post(QString URL, QVariantMap params, QVariantMap header, QVariantMap body)
+{
+    httpRequest _request = makeRequest(URL, params, header, body);
+    QNetworkReply* reply = manager.post(_request.request, _request.body.toJson());
+    connect(reply, &QNetworkReply::readyRead,this, &HttpsWorker::readyRead);
+}
+
+void HttpsWorker::patch(QString URL, QVariantMap params, QVariantMap header, QVariantMap body)
+{
+
+    httpRequest _request = makeRequest(URL, params, header, body);
+    QNetworkReply* reply = manager.sendCustomRequest(_request.request, "PATCH", _request.body.toJson());
+    connect(reply, &QNetworkReply::readyRead, this, &HttpsWorker::readyRead);
 
 }
 
-void HttpsWorker::post(QString URL, QByteArray data)
-{
+httpRequest HttpsWorker::makeRequest(QString URL, QVariantMap params, QVariantMap header, QVariantMap body){
+    QMapIterator<QString, QVariant> p(params);
+    QMapIterator<QString, QVariant> h(header);
+    QMapIterator<QString, QVariant> b(body);
+    QNetworkRequest request;
 
-    QNetworkRequest request = QNetworkRequest(URL);
+    //URL and params
+    if (p.hasNext()){
+        URL = URL + "?";
+        while(p.hasNext()){
+            p.next();
+            URL = URL + p.key() + "=" + p.value().toString();
+            if(p.hasNext()) URL = URL+ "&";
+        }
+    }
+    //qInfo() << Q_FUNC_INFO << "URL: " << URL;
+    request.setUrl(URL);
+
+    //header
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    QNetworkReply* reply = manager.post(request, data);
-    connect(reply, &QNetworkReply::readyRead,this, &HttpsWorker::readyRead);
+    while(h.hasNext()){
+        h.next();
+        QString key = h.key();
+        QString value = h.value().toString();
+        request.setRawHeader(key.toLocal8Bit(), value.toLocal8Bit());
+    }
 
+    //body
+    bodyDoc = QJsonDocument::fromVariant(body); //qInfo() << Q_FUNC_INFO << "body: " << bodyDoc.toJson();
+    _request.request = request;
+    _request.body = bodyDoc;
+    return _request;
 }
 
 void HttpsWorker::readyRead()
 {
-
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
     Q_UNUSED(reply);
-
 }
+
 
 void HttpsWorker::authenticationRequired(QNetworkReply *reply, QAuthenticator *authenticator)
 {
     Q_UNUSED(reply);
     Q_UNUSED(authenticator);
     qInfo() << "authentication Required";
-
 }
-
 
 void HttpsWorker::finished(QNetworkReply *reply)
 {
     reply->deleteLater();
     if(!reply) return;
+//    if(reply->error()){
+//        qInfo() << Q_FUNC_INFO << "QNetworkReply error: " << reply->error();
+//        qInfo() << Q_FUNC_INFO << "QNetworkReply body: " << reply->readAll();
+//        qInfo() << Q_FUNC_INFO << "QNetworkRequest URL: " << _request.request.url();
+//        qInfo() << Q_FUNC_INFO << "QNetworkRequest body: " << _request.body;
+//        const QList<QByteArray>& rawHeaderList(_request.request.rawHeaderList());
+//        foreach (QByteArray rawHeader, rawHeaderList) {
+//          qInfo() << Q_FUNC_INFO << "QNetworkRequest rawHeader: " << _request.request.rawHeader(rawHeader);
+//        }
+
+//    }
     QByteArray responseBytes = reply->readAll();
-    qInfo() << "in HttpsWorker::finished";
+    //qInfo() << "in HttpsWorker::finished";s
     auto responseDoc = QJsonDocument::fromJson(responseBytes);
     QJsonObject responseObj = responseDoc.object();
     QVariantMap responseMap = responseObj.toVariantMap();
     emit requestFinished(responseMap);
     return;
-
 }
 
 void HttpsWorker::networkAccessibleChanged(QNetworkAccessManager::NetworkAccessibility accessible)

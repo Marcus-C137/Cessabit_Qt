@@ -13,18 +13,23 @@ public:
 
 public slots:
     void getTemps();
-    void setTemps();
+    void setTemps(int port, int alarmLabel, qreal val);
     //void startTimer();
 
 signals:
     void tempUpdate(QVariantList temps);
+    void powerUpdate(QVariantList power);
+    void firebaseUpdate(QVariantList tempsAndPower);
+    void newTemps();
 
 private:
+    void loadTemps(QVector<QVector<qreal>> setAlms);
     QTimer *getTempsTimer;
     QTimer *setTempsTimer;
-    int fd;
     float setTempers[4] = {79.9, 80.0, 80.1, 80.2};
+    int fd;
     int file_i2c;
+    int file_gpio;
 };
 
 #endif // ARDUINOCOMS_H

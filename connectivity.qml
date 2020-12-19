@@ -1,7 +1,6 @@
 import QtQuick 2.12
 import QtQuick.Controls 2.12
-import QtQuick.Controls.Material 2.12
-
+import QtQuick.VirtualKeyboard 2.1
 
 Page {
     id: connectivity
@@ -11,6 +10,8 @@ Page {
         anchors.fill: parent
     }
 
+    //////////LOGIC//////////////
+
     Component.onCompleted: {
         console.log("Connectivity.qml loaded");
         wifiManager.checkWifi()
@@ -19,10 +20,12 @@ Page {
     Connections{
         target: wifiManager
         onNewWifiRSSI:{
-            console.log("in onNewWifiRSSI");
+            console.log("in onNewWifiRSSI: " + connected);
+            rec_newWifiLoading.visible = false;
             if(connected){
                 wifiStatus.visible            = true;
                 progressBar.visible           = true;
+                progressBarBackGround.visible = true;
                 tickPoor.visible              = true;
                 tickAverage.visible           = true;
                 tickExcellent.visible         = true;
@@ -32,6 +35,7 @@ Page {
                 txt_sigStrength.visible       = true;
                 progressBar.value             = val;
                 wifiStatus.text               = "Connected to " + SSID;
+                animationLoadSignal.start()
             }else{
                 wifiStatus.visible            = true;
                 progressBarBackGround.visible = false;
@@ -57,47 +61,113 @@ Page {
 
         onNewScannedSSIDs:{
             console.log(SSIDs);
-            popup_ListView.model = SSIDs
+            popup_ListView.model = SSIDs;
+            busyIndi.running = false;
+            popup_ScrollView.visible = true;
 
         }
     }
+
+    ///////////////POPUPS//////////////////
 
     Popup{
         id: popup_scannedNetworks
         anchors.centerIn: parent
         width: 500
         height: 500
-        closePolicy: Popup.CloseOnPressOutside
+        //closePolicy: Popup.CloseOnPressOutside
+        modal: false
+        focus: true
+        background: Rectangle{
+            anchors.fill: parent
+            color: "black"
+        }
+
         onOpened: {
             wifiManager.scanSSIDs();
+            busyIndi.running = true
+            popup_ScrollView.visible = false;
         }
+        BusyIndicator{
+            id: busyIndi
+            running: true
+            anchors.centerIn: parent
+            width: 150
+            height: 150
+        }
+
+        ScrollView{
+            id:popup_ScrollView
+            anchors.fill: parent
+            visible: false
+            ListView{
+                id:popup_ListView
+                width:parent.width
+                clip: true
+                model: 0
+                delegate: ItemDelegate{
+                    id: popup_itemDelegate
+                    height: 90
+                    //text: modelData
+                    Text{
+                        id:txt_SSIDname
+                        color: "white"
+                        text: modelData
+                        font.pixelSize: 28
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Rectangle{
+                        height: 2
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        width: parent.width
+                        anchors.top: txt_SSIDname.bottom
+                        color: "#56a0d4"
+                    }
+
+                    width: parent.width
+                    onClicked: {
+                        popup_SSIDselected.open();
+                        txt_SSIDselected.ssid = modelData;
+                        txt_password.text = "";
+                    }
+                }
+            }
+        }
+
         Popup{
             id:popup_SSIDselected
-            anchors.centerIn: parent
+            //x:popup_scannedNetworks.width - popup_SSIDselected.width/2
+            x:(popup_scannedNetworks.width-popup_SSIDselected.width)/2
+            closePolicy: Popup.NoAutoClose
             width: 400
             height: 200
+            modal: false
+            focus: true
+            background: Rectangle{
+                anchors.fill: parent
+                color: "black"
+                border.color: "#56a0d4"
+            }
             Text{
                 id: txt_SSIDselected
                 width: 400
                 height: 50
+                color: "white"
                 anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.leftMargin: 10
+                anchors.topMargin: 10
                 font.pointSize: 16
                 property var ssid: ""
                 text: "Password for " + ssid
             }
             TextInput{
                 id: txt_password
-                anchors.top: txt_SSIDselected.bottom
                 width: 400
                 height: 50
-                anchors.bottom: toolButton.top
-                anchors.bottomMargin: -80
-                anchors.left: toolButton.right
-                anchors.leftMargin: -69
-                anchors.right: toolButton.left
-                anchors.rightMargin: -380
-                anchors.horizontalCenter: toolButton.horizontalCenter
-                anchors.verticalCenter: toolButton.verticalCenter
+                anchors.top: txt_SSIDselected.bottom
+                color: "white"
             }
             Button{
                 id: btn_close
@@ -116,31 +186,56 @@ Page {
                 onClicked: {
                     console.log("SSID: " + txt_SSIDselected.ssid + " password: " + txt_password.text);
                     wifiManager.connectToSSID(txt_SSIDselected.ssid, txt_password.text)
+                    wifiManager.resetTimer();
+                    progressBar.value = 0;
+                    rec_newWifiLoading.visible = true
+                    animationLoadForward.start()
+                    popup_SSIDselected.close()
+                    popup_scannedNetworks.close()
                }
             }
         }
 
-        ScrollView{
-            id:popup_ScrollView
-            anchors.fill: parent
-            ListView{
-                id:popup_ListView
-                width:parent.width
-                clip: true
-                model: 0
-                delegate: ItemDelegate{
-                    id: popup_itemDelegate
-                    text: modelData
-                    width: parent.width
-                    onClicked: {
-                        popup_SSIDselected.open();
-                        txt_SSIDselected.ssid = modelData;
-                    }
-                }
-            }
-        }
 
     }
+
+    //////////////////LOADER//////////////////////////
+
+    Rectangle{
+        id: rec_newWifiLoading
+        height: 20
+        width: 0
+        x: 260
+        y: 300
+        radius: 20
+        color: "red"
+        visible: false;
+        PropertyAnimation{
+            id:animationLoadForward
+            target: rec_newWifiLoading
+            property: "width"
+            to: 500
+            duration: 1000
+            easing.type: Easing.InOutQuad
+            onFinished: {
+                animationLoadBack.start()
+            }
+
+        }
+        PropertyAnimation{
+            id:animationLoadBack
+            target: rec_newWifiLoading
+            property: "width"
+            to: 0
+            duration: 1000
+            easing.type: Easing.InOutQuad
+            onFinished: {
+                animationLoadForward.start()
+            }
+        }
+    }
+
+    /////////////BACK BUTTON//////////////////
 
     Button {
         id: toolButton
@@ -170,6 +265,20 @@ Page {
 
     }
 
+    /////////////////////MAIN UI//////////////////
+
+    Text {
+        id: wifiStatus
+        width: 300
+        height: 50
+        y:100
+        color: "#ffffff"
+        anchors.horizontalCenter: parent.horizontalCenter
+        verticalAlignment: Text.AlignVCenter
+        horizontalAlignment: Text.AlignHCenter
+        font.pixelSize: 28
+    }
+
     Rectangle {
         id: progressBarBackGround
         anchors.top: wifiStatus.bottom
@@ -182,31 +291,25 @@ Page {
             id: progressBar
             anchors.left: parent.left
             anchors.top: parent.top
-            width: parent.width * value
+            width: 0
             height: parent.height
             property var value: 0.5
             gradient: Gradient{
                 GradientStop{position: 0.0; color: Qt.rgba(0.9, 0.1, 0, 1)}
-                GradientStop{position: 1.0; color: Qt.rgba(1-progressBar.value, progressBar.value, 0, 1)}
+                GradientStop{position: 1.0; color: Qt.rgba(1-progressBar.width, progressBar.width, 0, 1)}
                 orientation: Gradient.Horizontal;
             }
+            PropertyAnimation{
+                id:animationLoadSignal
+                target: progressBar
+                property: "width"
+                to: progressBarBackGround.width * progressBar.value
+                duration: 3000
+                easing.type: Easing.InOutQuad
+            }
         }
-
-
     }
 
-
-    Text {
-        id: wifiStatus
-        width: 300
-        height: 50
-        y:75
-        color: "#ffffff"
-        anchors.horizontalCenter: parent.horizontalCenter
-        verticalAlignment: Text.AlignVCenter
-        horizontalAlignment: Text.AlignHCenter
-        font.pixelSize: 28
-    }
 
     Rectangle {
         id: tickPoor
@@ -298,12 +401,9 @@ Page {
         id: btn_changeWifi
 
         contentItem: Text {
-            /// \u25C0 = back
-            /// \u2630 = hamburger
             text: "Connect to a Network"
             color: "white"
             font.pointSize: 24
-
         }
 
         onClicked: {
@@ -321,7 +421,15 @@ Page {
 
 
     }
-
+    InputPanel {
+        id: inputPanel
+        y: Qt.inputMethod.visible ? parent.height - inputPanel.height : parent.height
+        anchors.left: parent.left
+        anchors.right: parent.right
+        z: 1
+        parent: Overlay.overlay
+        focus: true
+    }
 
 }
 

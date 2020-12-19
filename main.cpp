@@ -29,21 +29,25 @@ int main(int argc, char *argv[])
         if (!obj && url == objUrl)
             QCoreApplication::exit(-1);
     }, Qt::QueuedConnection);
-    engine.load(url);
 
     ChartData cd;
     Logger::attach();
-    ArduinoComs coms;
     WifiManager wifiManager;
     Singleton<Localdb>::GetInstance();
     Singleton<Localdb>::GetInstance().checkDBs();
+    Singleton<Localdb>::GetInstance().checkUserAccount();
     Singleton<Localdb>::GetInstance().cleanDBbyMin->start(10000);
-    Firebase firebase;
-    firebase.login("marcushoutzager@gmail.com", "password");
-
+    Singleton<Localdb>::GetInstance().loadAlarmTemps();
+    ArduinoComs coms;
     QQmlContext* context = engine.rootContext();
+    Firebase firebase;
+    firebase.loginViaDB();
+    firebase.setWifiManager(&wifiManager);
+    firebase.setArduinoComs(&coms);
     context->setContextProperty("arduinoComms", &coms);
     context->setContextProperty("chartDataObj", &cd);
     context->setContextProperty("wifiManager", &wifiManager);
+    context->setContextProperty("firebase", &firebase);
+    engine.load(url);
     return app.exec();
 }

@@ -15,6 +15,7 @@ signals:
 
 public slots:
     void start(QString command, QStringList);
+    void startCommand(QString command);
     void stop();
 
 private slots:

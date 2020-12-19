@@ -8,14 +8,16 @@ Process::Process(QObject *parent) : QObject(parent)
     connect(&m_process, &QProcess::readyReadStandardOutput, this, &Process::readyReadStandardOutput);
     connect(&m_process, &QProcess::started, this, &Process::started);
     connect(&m_process, &QProcess::stateChanged, this, &Process::stateChanged);
-
     connect(&m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &Process::finished);
-
 }
 
 void Process::start(QString command, QStringList args)
 {
     m_process.start(command, args);
+}
+
+void Process::startCommand(QString command){
+    m_process.start(command);
 }
 
 void Process::stop()
@@ -33,22 +35,26 @@ void Process::errorOccured(QProcess::ProcessError error)
 void Process::finished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     //qInfo() << Q_FUNC_INFO;
-    Q_UNUSED(exitStatus);
-    Q_UNUSED(exitCode);
-    QByteArray data = m_process.readAllStandardOutput();
-    emit output(QString(data.trimmed()),0);
+    if (exitCode !=0){
+
+        QByteArray data = m_process.readAllStandardError();
+        emit output(QString(data.trimmed()),exitCode);
+    }else{
+        QByteArray data = m_process.readAllStandardOutput();
+        emit output(QString(data.trimmed()),exitCode);
+    }
+
     this->stop();
-    //emit output("Complete", exitCode);
 
 }
 
 void Process::readyReadStandardError()
 {
     //qInfo()<<Q_FUNC_INFO;
-    QByteArray data = m_process.readAllStandardError();
-    QString message = "Standard Error: ";
-    message.append(m_process.readAllStandardError());
-    emit output(message,2);
+    //QByteArray data = m_process.readAllStandardError();
+    //QString message = "Standard Error: ";
+    //message.append(m_process.readAllStandardError());
+    //emit output(message,2);
 }
 
 void Process::readyReadStandardOutput()

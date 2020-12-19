@@ -23,8 +23,19 @@ WifiManager::WifiManager(QObject *parent) : QObject(parent)
     p_connectToWifi = new Process(this);
     connect(p_connectToWifi, &Process::output, this, &WifiManager::connectToSSIDResult);
 
+    p_connectToWifiAgain = new Process(this);
+    connect(p_connectToWifiAgain, &Process::output, this, &WifiManager::connectToSSIDAgainResult);
+
     p_scanSSIDs = new Process(this);
     connect(p_scanSSIDs, &Process::output, this, &WifiManager::scanSSIDsResult);
+
+    p_writeToWPA = new Process(this);
+    connect(p_writeToWPA, &Process::output, this, &WifiManager::writeToWPAResults);
+
+    p_getMac = new Process(this);
+    connect(p_getMac, &Process::output, this, &WifiManager::getMacResults);
+
+    checkWifiAgainTimer = new QTimer(this);
 
     ncm = new QNetworkConfigurationManager(this);
     connect(ncm, &QNetworkConfigurationManager::configurationAdded, this, &WifiManager::configurationAdded);
@@ -32,8 +43,25 @@ WifiManager::WifiManager(QObject *parent) : QObject(parent)
     connect(ncm, &QNetworkConfigurationManager::configurationRemoved, this, &WifiManager::configurationRemoved);
     connect(ncm, &QNetworkConfigurationManager::onlineStateChanged, this, &WifiManager::onlineStateChanged);
     connect(ncm, &QNetworkConfigurationManager::updateCompleted, this, &WifiManager::updateComplete);
+
+    this->getMac();
 }
 
+void WifiManager::getMac()
+{
+    QString command = "ifconfig";
+    QStringList args = {};
+    p_getMac->start(command, args);
+}
+
+void WifiManager::getMacResults(QString results, int code)
+{
+   if(code !=0){
+        qDebug() << Q_FUNC_INFO << "Error retrieving mac error code: " << code;
+   }
+   macID = results.split("wlan0")[1].split("ether")[1].left(18);
+   qInfo() << Q_FUNC_INFO << "macID " << macID;
+}
 QHostAddress WifiManager::getIP()
 {
     QNetworkInterface wlan0 = QNetworkInterface::interfaceFromName("wlan0");
@@ -69,10 +97,11 @@ void WifiManager::getWifiStrengthResult(QString result, int code)
         qInfo() << Q_FUNC_INFO << "code not equal to zero";
         emit newWifiRSSI(false, 0, "");
         return;
+    }else if(code == 255){
+        qInfo() << Q_FUNC_INFO << " code equal to 255 waiting";
+
     }
-
     int start_indx = result.indexOf("Link Quality=");
-
     if (start_indx == -1){
         emit newWifiRSSI(false, 0, "");
         return;
@@ -97,23 +126,62 @@ void WifiManager::getWifiStrengthResult(QString result, int code)
 
 void WifiManager::connectToSSID(QString SSID, QString password)
 {
-
+    QString command = "bash";
+    QStringList args;
+    args << "/home/pi/connectToSSID.sh" << SSID << password;
+    p_writeToWPA->start(command, args);
 }
 
 void WifiManager::connectToSSIDResult(QString result, int code)
 {
-    //TODO: error if cannot convert to number or if indexOf returns 0;
+    qInfo() << Q_FUNC_INFO << "wpa_cli out: " << result;
 
-    //qInfo() << Q_FUNC_INFO << result << " Code " << code;
-    int start_indx = result.indexOf("Link Quality=");
-    int end_indx = result.indexOf("/70");
-    int start_indx_end = start_indx + 13;
-    QStringRef subString(&result, start_indx_end, end_indx-start_indx_end);
-    //qInfo() << Q_FUNC_INFO << subString;
-    int RSSIval = subString.toInt();
-    //emit newWifiRSSI(RSSIval);
+    if (code !=0 )
+    {
+        emit connectToWifiResults(false);
+        qInfo() << Q_FUNC_INFO << "wpa_cli error code: " << code;
+        return;
+    }
+    else
+    {
+        emit connectToWifiResults(true);
+    }
 }
 
+void WifiManager::connectToSSIDAgainResult(QString result, int code)
+{
+    Q_UNUSED(result);
+    Q_UNUSED(code);
+    checkWifiAgainTimer = new QTimer(this);
+    checkWifiAgainTimer->singleShot(2000, this, SLOT(activateConnectToSSID()));
+
+}
+
+void WifiManager::activateConnectToSSID()
+{
+    qInfo() << Q_FUNC_INFO;
+    QStringList args;
+    args << "wpa_cli" << "-i" << "wlan0" << "reconfigure";
+    QString command  = "sudo";
+    p_connectToWifi->start(command, args);
+}
+
+void WifiManager::writeToWPAResults(QString result, int code){
+    qInfo() << Q_FUNC_INFO << "write to wpa_supplicant output: " << result;
+    if (code !=0 )
+    {
+        emit connectToWifiResults(false);
+        qInfo() << Q_FUNC_INFO << "Did not write to wpa_supplicant";
+        return;
+    }
+    else
+    {
+        QStringList args;
+        args << "wpa_cli" << "-i" << "wlan0" << "reconfigure";
+        QString command  = "sudo";
+        p_connectToWifiAgain->start(command, args);
+    }
+}
 
 void WifiManager::scanSSIDs()
 {
@@ -129,6 +197,10 @@ void WifiManager::scanSSIDsResult(QString result, int code)
     qInfo() << "in scanSSIDsResult";
     qInfo() << "Code : " << code;
     qInfo() << Q_FUNC_INFO << result.count("ESSID:");
+    if(code == 255){
+        checkWifiAgainTimer->singleShot(5000, this, SLOT(scanSSIDs()));
+        return;
+    }
     QStringList SSIDs;
     int start_indx = 0;
     for(int i=0; i<result.count("ESSID:"); i++)
@@ -139,9 +211,8 @@ void WifiManager::scanSSIDsResult(QString result, int code)
         int start_indx_end = start_indx + ESSID_length;
         start_indx = end_indx + 1;
         QString SSID = result.mid(start_indx_end, end_indx-start_indx_end);
-        qInfo() << Q_FUNC_INFO << SSID;
-        if (!SSID.isEmpty()) SSIDs.append(SSID);
-
+        //qInfo() << Q_FUNC_INFO << SSID;
+        if (!SSID.isEmpty() || SSID.startsWith("\\x")) SSIDs.append(SSID);
     }
     emit newScannedSSIDs(SSIDs);
 }
@@ -171,6 +242,12 @@ void WifiManager::configurationRemoved(const QNetworkConfiguration &config)
 void WifiManager::updateComplete()
 {
     //qInfo() << Q_FUNC_INFO;
+}
+
+void WifiManager::resetTimer()
+{
+    wifiTimer->stop();
+    wifiTimer->start(10000);
 }
 
 

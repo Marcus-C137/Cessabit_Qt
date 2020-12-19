@@ -7,11 +7,14 @@ Page {
     Connections{
         target: arduinoComms
         onTempUpdate:{
-            console.log("In on Temp update")
-            port1_txt.text = temps[0].toFixed(1);
-            port2_txt.text = temps[1].toFixed(1);
-            port3_txt.text = temps[2].toFixed(1);
-            port4_txt.text = temps[3].toFixed(1);
+            var portTemps = [port1_txt, port2_txt, port3_txt, port4_txt];
+            for(var i=0 ; i< 4; i++){
+                if (temps[i] < -10){
+                    portTemps[i].text = (i+1).toString() + ". " + "Disconnected";
+                }else{
+                    portTemps[i].text = (i+1).toString() + ". " + temps[i].toFixed(1) + " F";
+                }
+            }
         }
     }
 
@@ -161,6 +164,7 @@ Page {
         TapHandler{
             id: tap_port1
             onTapped: {
+                chartDataObj.setPort(1);
                 stack.push("port.qml")
             }
         }
@@ -184,6 +188,7 @@ Page {
         TapHandler{
             id: tap_port2
             onTapped: {
+                chartDataObj.setPort(2);
                 stack.push("port.qml")
             }
         }
@@ -206,6 +211,7 @@ Page {
         TapHandler{
             id: tap_port3
             onTapped: {
+                chartDataObj.setPort(3);
                 stack.push("port.qml")
             }
         }
@@ -227,6 +233,7 @@ Page {
         TapHandler{
             id: tap_port4
             onTapped: {
+                chartDataObj.setPort(4);
                 stack.push("port.qml")
             }
         }

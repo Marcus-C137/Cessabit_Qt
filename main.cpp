@@ -38,6 +38,7 @@ int main(int argc, char *argv[])
     Singleton<Localdb>::GetInstance().checkUserAccount();
     Singleton<Localdb>::GetInstance().cleanDBbyMin->start(10000);
     Singleton<Localdb>::GetInstance().loadAlarmTemps();
+    Singleton<Localdb>::GetInstance().loadPortsOn();
     ArduinoComs coms;
     QQmlContext* context = engine.rootContext();
     Firebase firebase;

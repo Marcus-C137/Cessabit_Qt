@@ -18,11 +18,6 @@ class Firebase : public QObject
     Q_OBJECT
     Q_PROPERTY(bool signedIn READ signedIn WRITE setSignedIn NOTIFY signedInChanged)
     Q_PROPERTY(QString uname READ uname);
-    Q_PROPERTY(bool almSetting_deviceOffline        READ almSetting_deviceOffline       WRITE setAlmSetting_deviceOffline           NOTIFY almSetting_deviceOfflineChanged)
-    Q_PROPERTY(bool almSetting_lowTemp              READ almSetting_lowTemp             WRITE setAlmSetting_lowTemp                 NOTIFY almSetting_lowTempChanged)
-    Q_PROPERTY(bool almSetting_highTemp             READ almSetting_highTemp            WRITE setAlmSetting_highTemp                NOTIFY almSetting_highTempChanged)
-    Q_PROPERTY(bool almSetting_notResponsive        READ almSetting_notResponsive       WRITE setAlmSetting_notResponsive           NOTIFY almSetting_notResponsiveChanged)
-    Q_PROPERTY(bool almSetting_sensorDisconnect     READ almSetting_sensorDisconnect    WRITE setAlmSetting_sensorDisconnect        NOTIFY almSetting_sensorDisonncetChanged)
     Q_PROPERTY(bool notifSetting_pushNotifications  READ notifSetting_pushNotifications WRITE setnotifSetting_pushNotifications     NOTIFY notifSetting_pushNotificationsChanged)
     Q_PROPERTY(bool notifSetting_textMe             READ notifSetting_textMe            WRITE setnotifSetting_textMe                NOTIFY notifSetting_textMeChanged)
     Q_PROPERTY(bool notifSetting_textFriends        READ notifSetting_textFriends       WRITE setnotifSetting_textFriends           NOTIFY notifSetting_textFriendsChanged)
@@ -46,17 +41,14 @@ public:
     bool notifSetting_pushNotifications() const{return m_notifSetting_pushNotifications;}
     bool notifSetting_textMe() const{return m_notifSetting_textMe;}
     bool notifSetting_textFriends() const{return m_notifSetting_textFriends;}
+    bool portsOn[4];
     QString uname() const{return m_uname;}
 
 signals:
+    void activateEstop(bool value);
     void signedInChanged(bool signedIn);
     void signInResults(bool successful);
     void refreshedAuth();
-    void almSetting_highTempChanged(bool almSetting_highTemp);
-    void almSetting_deviceOfflineChanged(bool almSetting_deviceOffline);
-    void almSetting_lowTempChanged(bool almSetting_lowTemp);
-    void almSetting_notResponsiveChanged(bool almSetting_notResponsive);
-    void almSetting_sensorDisonncetChanged(bool almSetting_sensorDisconnect);
     void notifSetting_pushNotificationsChanged(bool notifSetting_pushNotifications);
     void notifSetting_textMeChanged(bool notifSetting_textMe);
     void notifSetting_textFriendsChanged(bool notifSetting_textFriends);
@@ -75,6 +67,12 @@ public slots:
     void updateTempsDocResults(QVariantMap map);
     void updateAlmsDoc(int almCategory);
     void updateAlmsDocResults(QVariantMap map);
+    void updatePortsOn(int port, bool portOn);
+    void updatePortsOnResults(QVariantMap map);
+    void updateHeartbeatDoc();
+    void updateHeartbeatDocResults(QVariantMap map);
+    void sendAlarm(QString title, QString message);
+    void sendAlarmResults(QVariantMap map);
     void readDoc();
     void readDocResults(QVariantMap response);
     void login(QString uname, QString password);
@@ -86,41 +84,6 @@ public slots:
         if (m_signedIn == signedIn)return;
         m_signedIn = signedIn;
         emit signedInChanged(m_signedIn);
-    }
-
-    void setAlmSetting_highTemp(bool almSetting_highTemp)
-    {
-        if (m_almSetting_highTemp == almSetting_highTemp)return;
-        m_almSetting_highTemp = almSetting_highTemp;
-        emit almSetting_highTempChanged(m_almSetting_highTemp);
-    }
-
-    void setAlmSetting_deviceOffline(bool almSetting_deviceOffline)
-    {
-        if (m_almSetting_deviceOffline == almSetting_deviceOffline) return;
-        m_almSetting_deviceOffline = almSetting_deviceOffline;
-        emit almSetting_deviceOfflineChanged(m_almSetting_deviceOffline);
-    }
-
-    void setAlmSetting_lowTemp(bool almSetting_lowTemp)
-    {
-        if (m_almSetting_lowTemp == almSetting_lowTemp) return;
-        m_almSetting_lowTemp = almSetting_lowTemp;
-        emit almSetting_lowTempChanged(m_almSetting_lowTemp);
-    }
-
-    void setAlmSetting_notResponsive(bool almSetting_notResponsive)
-    {
-        if (m_almSetting_notResponsive == almSetting_notResponsive) return;
-        m_almSetting_notResponsive = almSetting_notResponsive;
-        emit almSetting_notResponsiveChanged(m_almSetting_notResponsive);
-    }
-
-    void setAlmSetting_sensorDisconnect(bool almSetting_sensorDisconnect)
-    {
-        if (m_almSetting_sensorDisconnect == almSetting_sensorDisconnect) return;
-        m_almSetting_sensorDisconnect = almSetting_sensorDisconnect;
-        emit almSetting_sensorDisonncetChanged(m_almSetting_sensorDisconnect);
     }
 
     void setnotifSetting_pushNotifications(bool notifSetting_pushNotifications)
@@ -156,6 +119,9 @@ private:
     HttpsWorker *updateSettingsDoc_httpWorker;
     HttpsWorker *updateTempsDoc_httpWorker;
     HttpsWorker *updateAlmsDoc_httpWorker;
+    HttpsWorker *updateHeartbeatDoc_httpWorker;
+    HttpsWorker *updatePortsOn_httpWorker;
+    HttpsWorker *sendAlarm_httpWorker;
     QTimer *downloadDocTimer;
     QTimer refreshAuthTimer;
     QString idToken;

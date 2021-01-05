@@ -92,17 +92,16 @@ void HttpsWorker::finished(QNetworkReply *reply)
 {
     reply->deleteLater();
     if(!reply) return;
-//    if(reply->error()){
-//        qInfo() << Q_FUNC_INFO << "QNetworkReply error: " << reply->error();
-//        qInfo() << Q_FUNC_INFO << "QNetworkReply body: " << reply->readAll();
-//        qInfo() << Q_FUNC_INFO << "QNetworkRequest URL: " << _request.request.url();
-//        qInfo() << Q_FUNC_INFO << "QNetworkRequest body: " << _request.body;
-//        const QList<QByteArray>& rawHeaderList(_request.request.rawHeaderList());
-//        foreach (QByteArray rawHeader, rawHeaderList) {
-//          qInfo() << Q_FUNC_INFO << "QNetworkRequest rawHeader: " << _request.request.rawHeader(rawHeader);
-//        }
-
-//    }
+    if(reply->error()){
+        qInfo() << Q_FUNC_INFO << "QNetworkReply error: " << reply->error();
+        qInfo() << Q_FUNC_INFO << "QNetworkReply body: " << reply->readAll();
+        qInfo() << Q_FUNC_INFO << "QNetworkRequest URL: " << _request.request.url();
+        qInfo() << Q_FUNC_INFO << "QNetworkRequest body: " << _request.body;
+        const QList<QByteArray>& rawHeaderList(_request.request.rawHeaderList());
+        foreach (QByteArray rawHeader, rawHeaderList) {
+          qInfo() << Q_FUNC_INFO << "QNetworkRequest rawHeader: " << _request.request.rawHeader(rawHeader);
+        }
+    }
     QByteArray responseBytes = reply->readAll();
     //qInfo() << "in HttpsWorker::finished";s
     auto responseDoc = QJsonDocument::fromJson(responseBytes);

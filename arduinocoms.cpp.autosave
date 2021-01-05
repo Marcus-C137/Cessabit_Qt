@@ -137,9 +137,9 @@ void ArduinoComs::getTemps()
                 alarmTitle = "Cessabit Alert";
                 alarmMessage += "Port " + QString::number(i+1) + " sensor has become disconnected \r\n";
             }
-            qInfo() << Q_FUNC_INFO << portsOn[i];
-            qInfo() << Q_FUNC_INFO << sensorsConnected[i];
-            qInfo() << Q_FUNC_INFO << sensorsWasConnected[i];
+//            qInfo() << Q_FUNC_INFO << portsOn[i];
+//            qInfo() << Q_FUNC_INFO << sensorsConnected[i];
+//            qInfo() << Q_FUNC_INFO << sensorsWasConnected[i];
             sensorsWasConnected[i] = sensorsConnected[i];
         }
 

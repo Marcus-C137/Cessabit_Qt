@@ -45,6 +45,9 @@ Firebase::Firebase(QObject *parent) : QObject(parent)
     updateSettingsDoc_httpWorker    = new HttpsWorker();
     updateTempsDoc_httpWorker       = new HttpsWorker();
     updateAlmsDoc_httpWorker        = new HttpsWorker();
+    updateHeartbeatDoc_httpWorker   = new HttpsWorker();
+    updatePortsOn_httpWorker        = new HttpsWorker();
+    sendAlarm_httpWorker            = new HttpsWorker();
     downloadDocTimer                = new QTimer(this);
     connect(login_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(loginResults(QVariantMap)));
     connect(refreshLogin_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(refreshAuthResults(QVariantMap)));
@@ -53,8 +56,12 @@ Firebase::Firebase(QObject *parent) : QObject(parent)
     connect(updateTempsDoc_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(updateTempsDocResults(QVariantMap)));
     connect(updateSettingsDoc_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(updateSettingsDocResults(QVariantMap)));
     connect(updateAlmsDoc_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(updateAlmsDocResults(QVariantMap)));
-    connect(downloadDocTimer, SIGNAL(timeout()), this, SLOT(readDoc()));
+    connect(updateHeartbeatDoc_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(updateHeartbeatDocResults(QVariantMap)));
+    connect(updatePortsOn_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(updatePortsOnResults(QVariantMap)));
+    connect(sendAlarm_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(sendAlarmResults(QVariantMap)));
     connect(&Singleton<Localdb>::GetInstance(), SIGNAL(newAlarmTempFirebase(int)), this, SLOT(updateAlmsDoc(int)));
+    connect(&Singleton<Localdb>::GetInstance(), SIGNAL(newPortOnVal(int, bool)), this, SLOT(updatePortsOn(int, bool)));
+    connect(downloadDocTimer, SIGNAL(timeout()), this, SLOT(readDoc()));
     downloadDocTimer->start(10000);
 }
 
@@ -72,6 +79,8 @@ void Firebase::setArduinoComs(ArduinoComs *comsRef)
 {
     coms = comsRef;
     connect(coms, SIGNAL(firebaseUpdate(QVariantList)), this, SLOT(newTempandPowerReading(QVariantList)));
+    connect(this, SIGNAL(activateEstop(bool)), coms, SLOT(activateEstop(bool)));
+    connect(coms,SIGNAL(firebaseAlarm(QString, QString)), this, SLOT(sendAlarm(QString, QString)));
 }
 
 void Firebase::login(QString uname, QString password)
@@ -187,21 +196,6 @@ void Firebase::refreshAuthResults(QVariantMap response)
 void Firebase::updateSettings(int setting, bool val)
 {
     switch (setting){
-    case 1: // deviceOffline
-        updateSettingsDoc("alarms", "deviceOffline", val);
-        break;
-    case 2: // lowTemp
-        updateSettingsDoc("alarms", "lowTemp", val);
-        break;
-    case 3: // highTemp
-        updateSettingsDoc("alarms", "highTemp", val);
-        break;
-    case 4: // notResponsive
-        updateSettingsDoc("alarms", "notResponsive", val);
-        break;
-    case 5: // sensorDisconnect
-        updateSettingsDoc("alarms", "sensorDisconnect", val);
-        break;
     case 6: // pushNotifications
         updateSettingsDoc("notifications", "pushNotifications", val);
         break;
@@ -260,6 +254,7 @@ void Firebase::readDoc()
         QVariantMap body;
         header["Authorization"] = "Bearer " + accessToken;
         readDoc_httpWorker->get(URL, params, header, body);
+        updateHeartbeatDoc();
     }
 }
 
@@ -267,34 +262,21 @@ void Firebase::readDocResults(QVariantMap response)
 {
     QJsonDocument jsonDoc = QJsonDocument::fromVariant(response);
     QJsonValue jsonVal = jsonDoc["fields"]["deviceOffline"]["booleanValue"];
-    chngRemote_alms = jsonDoc["fields"]["alarms"]["mapValue"]["fields"]["changedRemotely"]["booleanValue"].toBool();
     chngRemote_notifs = jsonDoc["fields"]["notifications"]["mapValue"]["fields"]["changedRemotely"]["booleanValue"].toBool();
     chngRemote_temps = jsonDoc["fields"]["setAlarms"]["mapValue"]["fields"]["changedRemotely"]["booleanValue"].toBool();
-    bool almSetting_highTemp             = false;
-    bool almSetting_lowTemp              = false;
-    bool almSetting_deviceOffline        = false;
-    bool almSetting_notResponsive        = false;
-    bool almSetting_sensorDisconnect     = false;
+    bool Estop = jsonDoc["fields"]["E-Stop"]["booleanValue"].toBool();
+    portsOn[0] = jsonDoc["fields"]["port1On"]["booleanValue"].toBool();
+    portsOn[1] = jsonDoc["fields"]["port2On"]["booleanValue"].toBool();
+    portsOn[2] = jsonDoc["fields"]["port3On"]["booleanValue"].toBool();
+    portsOn[3] = jsonDoc["fields"]["port4On"]["booleanValue"].toBool();
     bool notifSetting_pushNotifications  = false;
     bool notifSetting_textFriends        = false;
     bool notifSetting_textMe             = false;
     if (!initialDBdownloaded){
         initialDBdownloaded = true;
-        almSetting_highTemp             = jsonDoc["fields"]["alarms"]["mapValue"]["fields"]["highTemp"]["booleanValue"].toBool();
-        almSetting_lowTemp              = jsonDoc["fields"]["alarms"]["mapValue"]["fields"]["lowTemp"]["booleanValue"].toBool();
-        almSetting_deviceOffline        = jsonDoc["fields"]["alarms"]["mapValue"]["fields"]["deviceOffline"]["booleanValue"].toBool();
-        almSetting_notResponsive        = jsonDoc["fields"]["alarms"]["mapValue"]["fields"]["notResponsive"]["booleanValue"].toBool();
-        almSetting_sensorDisconnect     = jsonDoc["fields"]["alarms"]["mapValue"]["fields"]["sensorDisconnect"]["booleanValue"].toBool();
         notifSetting_pushNotifications  = jsonDoc["fields"]["notifications"]["mapValue"]["fields"]["pushNotifications"]["booleanValue"].toBool();
         notifSetting_textFriends        = jsonDoc["fields"]["notifications"]["mapValue"]["fields"]["textFriends"]["booleanValue"].toBool();
         notifSetting_textMe             = jsonDoc["fields"]["notifications"]["mapValue"]["fields"]["textMe"]["booleanValue"].toBool();
-    }
-    if(chngRemote_alms){
-        almSetting_highTemp             = jsonDoc["fields"]["alarms"]["mapValue"]["fields"]["highTemp"]["booleanValue"].toBool();
-        almSetting_lowTemp              = jsonDoc["fields"]["alarms"]["mapValue"]["fields"]["lowTemp"]["booleanValue"].toBool();
-        almSetting_deviceOffline        = jsonDoc["fields"]["alarms"]["mapValue"]["fields"]["deviceOffline"]["booleanValue"].toBool();
-        almSetting_notResponsive        = jsonDoc["fields"]["alarms"]["mapValue"]["fields"]["notResponsive"]["booleanValue"].toBool();
-        almSetting_sensorDisconnect     = jsonDoc["fields"]["alarms"]["mapValue"]["fields"]["sensorDisconnect"]["booleanValue"].toBool();
     }
     if(chngRemote_notifs){
         notifSetting_pushNotifications  = jsonDoc["fields"]["notifications"]["mapValue"]["fields"]["pushNotifications"]["booleanValue"].toBool();
@@ -304,14 +286,10 @@ void Firebase::readDocResults(QVariantMap response)
     if(chngRemote_temps){
 
     }
-    setAlmSetting_deviceOffline(almSetting_deviceOffline);
-    setAlmSetting_lowTemp(almSetting_lowTemp);
-    setAlmSetting_highTemp(almSetting_highTemp);
-    setAlmSetting_notResponsive(almSetting_notResponsive);
-    setAlmSetting_sensorDisconnect(almSetting_sensorDisconnect);
     setnotifSetting_pushNotifications(notifSetting_pushNotifications);
     setnotifSetting_textMe(notifSetting_textMe);
     setnotifSetting_textFriends(notifSetting_textFriends);
+    if(m_signedIn) emit activateEstop(Estop);
 }
 
 
@@ -464,6 +442,102 @@ void Firebase::updateAlmsDoc(int almCategory){
 }
 
 void Firebase::updateAlmsDocResults(QVariantMap map)
+{
+
+}
+
+void Firebase::updatePortsOn(int port, bool portOn)
+{
+    QString docName = wifiManager->macID;
+    QString almLabel;
+    QString URL = "https://firestore.googleapis.com/v1/projects/zagermonitoringfb/databases/(default)/documents/users/" + userId + "/devices/" + docName;
+    QVariantMap params;
+    QVariantMap header;
+    QVariantMap body_val;
+    QVariantMap body_field;
+    QVariantMap body;
+    QString updatedField;
+    if (port == 1){
+        updatedField = "port1On";
+    }else if(port == 2){
+        updatedField = "port2On";
+    }else if(port == 3){
+        updatedField = "port3On";
+    }else if(port == 4){
+        updatedField = "port4On";
+    }else{
+        qWarning() << Q_FUNC_INFO << "port does not equal 1-4 , port =" + QString::number(port);
+    }
+    params["updateMask.fieldPaths"] = updatedField;
+    header["Authorization"] = "Bearer " + accessToken;
+    body_val["booleanValue"] = portOn;
+    body_field[updatedField] = body_val;
+    body["fields"] = body_field;
+    updatePortsOn_httpWorker->patch(URL, params, header, body);
+}
+
+void Firebase::updatePortsOnResults(QVariantMap map)
+{
+    //qInfo() << Q_FUNC_INFO << map;
+}
+
+void Firebase::updateHeartbeatDoc()
+{
+    QDateTime time = QDateTime(QDateTime::currentDateTime());
+    QString docName = wifiManager->macID;
+    QString URL = "https://firestore.googleapis.com/v1/projects/zagermonitoringfb/databases/(default)/documents/heartbeat/heartbeats";
+    QString time_S = QString::number(time.currentSecsSinceEpoch());
+    QVariantMap params;
+    QVariantMap header;
+    QVariantMap body_time;
+    QVariantMap body_UIDmvfs;
+    QVariantMap body_UIDmv;
+    QVariantMap body_UID;
+    QVariantMap body;
+    QJsonObject timeMap;
+    QJsonObject notifiedMap;
+    timeMap.insert("integerValue", QDateTime::currentSecsSinceEpoch());
+    notifiedMap.insert("booleanValue", false);
+    QJsonObject vals
+    {
+        {"Time", timeMap},
+        {"Notified", notifiedMap}
+    };
+    QVariantMap body_values = vals.toVariantMap();
+
+    params["updateMask.fieldPaths"] = userId;
+    header["Authorization"] = "Bearer " + accessToken;
+    body_UIDmvfs["fields"] = body_values;
+    body_UIDmv["mapValue"] = body_UIDmvfs;
+    body_UID[userId] = body_UIDmv;
+    body["fields"] = body_UID;
+    updateHeartbeatDoc_httpWorker->patch(URL, params, header, body);
+}
+
+void Firebase::updateHeartbeatDocResults(QVariantMap map)
+{
+
+}
+
+void Firebase::sendAlarm(QString title, QString message)
+{
+    if(m_signedIn){
+        qInfo() << Q_FUNC_INFO << "sending firebase alarm";
+        QString URL = "https://us-central1-zagermonitoringfb.cloudfunctions.net/Alarm";
+        QVariantMap params;
+        QVariantMap header;
+        QVariantMap body;
+        header["Authorization"] = "Bearer " + idToken;
+        body["alarmTitle"] = title;
+        body["alarmMessage"] = message;
+        sendAlarm_httpWorker->post(URL, params, header, body);
+
+    }else{
+        qDebug() << Q_FUNC_INFO << "Trying to add device, but not signed into account";
+    }
+}
+
+void Firebase::sendAlarmResults(QVariantMap map)
 {
 
 }

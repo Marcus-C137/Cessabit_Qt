@@ -37,7 +37,9 @@ public:
     void checkDBs();
     void addUserInfo(QString uname, QString password);
     void changeAlarmTemp(int port, int alarmLabel, qreal val);
+    void changePortOn(int port, bool portOn);
     void loadAlarmTemps();
+    void loadPortsOn();
     static void initializeDB();
     bool testPlugin();
     QStringList checkUserAccount();
@@ -47,6 +49,8 @@ public:
     QThread DB_workerThread;
     QTimer *cleanDBbyMin;
     QVector<QVector<qreal>> setAlms;
+    QList<bool> getPortsOn();
+    QList<bool> portsOn;
 
 
 public slots:
@@ -63,6 +67,7 @@ signals:
     void newTempReading(QString db, int port, QDateTime time, qreal temp, qreal power);
     void newAlarmTemp(int port, int alarmLabel, qreal val);
     void newAlarmTempFirebase(int alarmLabel);
+    void newPortOnVal(int port, bool portOn);
 
 };
 

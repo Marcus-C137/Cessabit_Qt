@@ -10,6 +10,7 @@ ChartData::ChartData(QObject *parent) : QObject(parent)
 {    
     connect(&Singleton<Localdb>::GetInstance(), &Localdb::newTempReading, this, &ChartData::newTempRecieved);
     connect(&Singleton<Localdb>::GetInstance(), &Localdb::newAlarmTemp, this, &ChartData::newAlarmTemp);
+    connect(&Singleton<Localdb>::GetInstance(), &Localdb::newPortOnVal, this, &ChartData::newPortOn);
 
 }
 
@@ -84,9 +85,19 @@ void ChartData::loadTemps(QString db){
 
 }
 
+void ChartData::loadPortOn(){
+    QList<bool> portsOn = Singleton<Localdb>::GetInstance().getPortsOn();
+    emit portOnRefresh(portsOn[m_port]);
+}
+
 void ChartData::storeNewAlarmTemp(int alarmType, QVariant temp)
 {
     Singleton<Localdb>::GetInstance().changeAlarmTemp(m_port, alarmType, temp.toReal());
+}
+void ChartData::storePortOn(bool portOn)
+{
+    qInfo() << Q_FUNC_INFO << "storing port on";
+    Singleton<Localdb>::GetInstance().changePortOn(m_port, portOn);
 }
 
 QPoint ChartData::tempTime() const
@@ -120,6 +131,13 @@ void ChartData::newAlarmTemp(int port, int alarmLabel, qreal val)
     if(port == m_port){
         QVariant Val = QVariant(val);
         emit newAlarmTempUpdate(alarmLabel,val);
+    }
+}
+
+void ChartData::newPortOn(int port, bool portOn)
+{
+    if(port == m_port){
+        emit portOnRefresh(portOn);
     }
 }
 

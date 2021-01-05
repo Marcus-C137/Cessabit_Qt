@@ -60,6 +60,7 @@ void WifiManager::getMacResults(QString results, int code)
         qDebug() << Q_FUNC_INFO << "Error retrieving mac error code: " << code;
    }
    macID = results.split("wlan0")[1].split("ether")[1].left(18);
+   macID.remove(0,1);
    qInfo() << Q_FUNC_INFO << "macID " << macID;
 }
 QHostAddress WifiManager::getIP()

@@ -9,6 +9,7 @@ Page {
     property int alm_btn_pressed: 0;
     property int time_btn_pressed: 0;
     property string timeFormat: "h:mm:ss AP"
+    property bool portOnLocal: true;
     background: Rectangle{
         anchors.fill: parent
         color: "black"
@@ -17,6 +18,7 @@ Page {
     Component.onCompleted: {
         console.log("Port.qml loaded");
         chartDataObj.loadTemps("_min");
+        chartDataObj.loadPortOn();
         cv_port.animationOptions = ChartView.SeriesAnimations
         chartDataObj
     }
@@ -142,6 +144,12 @@ Page {
                 dataSeries.color = "yellow";
                 break;
             }
+        }
+        onPortOnRefresh: {
+            console.log("portOn " + portOn);
+            portOnLocal = portOn
+            portOn ? btn_portOn_background.color = "green" : btn_portOn_background.color = "red"
+            portOn ? btn_portOn_txt.text = "On" : btn_portOn_txt.text = "Off"
         }
     }
 
@@ -342,7 +350,7 @@ Page {
                     anchors.fill: parent
                     text: ""
                     color: "white"
-                    font.pointSize: 18
+                    font.pointSize: 16
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -374,7 +382,7 @@ Page {
             anchors.top: setTempBox.bottom
             anchors.leftMargin: 100
             anchors.rightMargin: 100
-            anchors.topMargin: 10
+            anchors.topMargin: 5
             Text{
                 anchors.left: parent.left
                 anchors.bottom: parent.bottom
@@ -391,7 +399,7 @@ Page {
                     id: btn_highTemp_txt
                     text: ""
                     color: "white"
-                    font.pointSize: 18
+                    font.pointSize: 16
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -426,11 +434,11 @@ Page {
             anchors.top: highTempBox.bottom
             anchors.leftMargin: 100
             anchors.rightMargin: 100
-            anchors.topMargin: 10
+            anchors.topMargin: 5
             Text{
                 anchors.left: parent.left
                 anchors.bottom: parent.bottom
-                font.pointSize: 18
+                font.pointSize: 16
                 text: "Low Alarm"
                 color: "white"
             }
@@ -443,7 +451,7 @@ Page {
                     id: btn_lowTemp_txt
                     text: ""
                     color: "white"
-                    font.pointSize: 18
+                    font.pointSize: 16
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -580,6 +588,56 @@ Page {
                 }
             }
 
+        }
+
+        Item{
+            id: portOnBox
+            height:50
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: lowTempBox.bottom
+            anchors.leftMargin: 100
+            anchors.rightMargin: 100
+            anchors.topMargin: 10
+            Text{
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+                font.pointSize: 18
+                text: "Port Mode"
+                color: "white"
+            }
+            Button{
+                id: btn_portOn
+                anchors.right: parent.right
+                width: 100;
+                contentItem: Text {
+                    anchors.fill: parent
+                    id: btn_portOn_txt
+                    text: ""
+                    color: "white"
+                    font.pointSize: 18
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle{
+                    id: btn_portOn_background
+                    width: 50;
+                    anchors.fill: parent
+                    border.width: 2
+                    radius: 5
+                }
+                onClicked: {
+                    port.alm_btn_pressed = 3;
+                    chartDataObj.storePortOn(!portOnLocal);
+                }
+            }
+            Rectangle{
+                color: "white"
+                height: 2
+                anchors.right: parent.right
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+            }
         }
 
     }

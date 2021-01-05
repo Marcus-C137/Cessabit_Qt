@@ -70,6 +70,10 @@ void Localdb::loadAlarmTemps()
     }
 }
 
+void Localdb::loadPortsOn(){
+    getPortsOn();
+}
+
 void Localdb::checkDBs()
 {
     QSqlQuery query(sql_db);
@@ -93,15 +97,24 @@ void Localdb::checkDBs()
         qWarning() <<  Q_FUNC_INFO << "Could not make table userAccount";
     }
 
-    params = "(uname TEXT, password TEXT)";
-    if(!query.exec(commandPre + "userAccount" + params)){
-        qWarning() <<  Q_FUNC_INFO << "Could not make table userAccount";
+    params = "(port INT, portOn BOOL)";
+    if(!query.exec(commandPre + "portsOn" + params)){
+        qWarning() << Q_FUNC_INFO << "Could not make table portsOn";
+    }
+    //Fill portsOn table
+    commandPre= "INSERT INTO portsOn(port,portOn) ";
+    for (int i=1; i < 5; i++){
+        QString command = commandPre + "SELECT " + QString::number(i) + ",true "
+                                      " WHERE NOT EXISTS("
+                                      "SELECT 1 "
+                                      "FROM portsOn "
+                                      "WHERE port = " + QString::number(i) + ");" ;
+
+        if(!query.exec(command)){qWarning() << Q_FUNC_INFO << "Could not fill table portsOn";};
     }
 
     params = "(port INT, setAlarm TEXT, val REAL)";
-    if(!query.exec(commandPre + "setAlarmTemps" + params)){
-        qWarning() << Q_FUNC_INFO << "Could not make table setAlarmTemps";
-    }
+    if(!query.exec(commandPre + "setAlarmTemps" + params)){ qWarning() << Q_FUNC_INFO << "Could not make table setAlarmTemps";}
     //Fill set alarm table
     commandPre= "INSERT INTO setAlarmTemps(port,setAlarm) ";
     for (int i=0; i < 12; i++){
@@ -157,6 +170,18 @@ void Localdb::changeAlarmTemp(int port, int alarmLabel, qreal val)
     emit newAlarmTempFirebase(alarmLabel);
 }
 
+void Localdb::changePortOn(int port, bool portOn)
+{
+    QSqlQuery query;
+    QString portOnS = "";
+    portOn ? portOnS = "true" : portOnS="false";
+    QString command = "UPDATE portsOn SET portOn=" + portOnS + " WHERE port=" + QString::number(port);
+    if(!query.exec(command)){
+        qWarning() << Q_FUNC_INFO << "Could not update table PortsOn";
+    };
+    emit newPortOnVal(port, portOn);
+}
+
 
 QList<qreal> Localdb::getAlarmTemps(int port)
 {
@@ -168,11 +193,11 @@ QList<qreal> Localdb::getAlarmTemps(int port)
         qWarning() << Q_FUNC_INFO << "Could not open setAlarmTemps";
     };
     if(!query.first()){
-        //Log error if no query first
+        qWarning() << Q_FUNC_INFO << "no query first";
     }
     for(int i =0; i<3; i++){
-        qreal temp = query.value(2).toReal();
         //qInfo() << Q_FUNC_INFO << query.value(2).toReal();
+        qreal temp = query.value(2).toReal();
         setAlms[port-1][i] = temp;
         temps.append(temp);
         query.next();
@@ -181,6 +206,59 @@ QList<qreal> Localdb::getAlarmTemps(int port)
     return temps;
 }
 
+QList<bool> Localdb::getPortsOn()
+{
+    QList<bool> _portsOn;
+    QSqlQuery query;
+    query.prepare("SELECT * FROM portsOn");
+
+    if (!query.exec()) qWarning() << "ERROR: " << query.lastError().text();
+
+    if(query.first()){
+        qInfo() << "QUERY FIRST RESULTS" << query.value(0).toString();
+    }
+    else{
+      qInfo() << "NO QUERY FIRST";
+    }
+
+    for (int i = 0; i < 4; i++){
+        qInfo() << "LOCALDB: QUERY RESULT port: " + QString::number(i) + "  =  " << query.value(0).toString();
+        qInfo() << "LOCALDB: QUERY RESULT portOn: " + QString::number(i) + "  =  " << query.value(1).toBool();
+        bool portOn = query.value(1).toBool();
+        _portsOn.append(portOn);
+        query.next();
+    }
+
+    portsOn = _portsOn;
+    return portsOn;
+}
+
+QVector<dbVal> Localdb::getTemps(QString db, int port, int count){
+
+    QVector<dbVal> timeTempsVec;
+    QSqlQuery query;
+    query.prepare("SELECT * FROM (SELECT * FROM port" + QString::number(port) + db  + " ORDER BY time DESC LIMIT " + QString::number(count) + ") ORDER BY time ASC");
+    if (!query.exec())
+        qWarning() << "ERROR: " << query.lastError().text();
+    if(query.first()){
+        qInfo() << "QUERY FIRST RESULTS" << query.value(0).toString();
+    }
+    else{
+      qInfo() << "NO QUERY FIRST";
+    }
+
+    for (int i = 0; i < count; i++){
+        qInfo() << "LOCALDB: QUERY RESULT time: " + QString::number(i) + "  =  " << query.value(0).toString();
+        qInfo() << "LOCALDB: QUERY RESULT temp: " + QString::number(i) + "  =  " << query.value(1).toString();
+        int time  = query.value(0).toInt();
+        float temp = query.value(1).toFloat();
+        timeTempsVec.push_back({time, temp});
+        query.next();
+
+    }
+    return timeTempsVec;
+
+}
 
 void Localdb::addReading(int port, qreal temp, qreal power)
 {
@@ -221,32 +299,7 @@ void Localdb::storeTempToDB(QString db, int port, qreal temp, qreal power){
     }
 }
 
-QVector<dbVal> Localdb::getTemps(QString db, int port, int count){
 
-    QVector<dbVal> timeTempsVec;
-    QSqlQuery query;
-    query.prepare("SELECT * FROM (SELECT * FROM port" + QString::number(port) + db  + " ORDER BY time DESC LIMIT " + QString::number(count) + ") ORDER BY time ASC");
-    if (!query.exec())
-        qWarning() << "ERROR: " << query.lastError().text();
-    if(query.first()){
-        qInfo() << "QUERY FIRST RESULTS" << query.value(0).toString();
-    }
-    else{
-      qInfo() << "NO QUERY FIRST";
-    }
-
-    for (int i = 0; i < count; i++){
-        qInfo() << "LOCALDB: QUERY RESULT time: " + QString::number(i) + "  =  " << query.value(0).toString();
-        qInfo() << "LOCALDB: QUERY RESULT temp: " + QString::number(i) + "  =  " << query.value(1).toString();
-        int time  = query.value(0).toInt();
-        float temp = query.value(1).toFloat();
-        timeTempsVec.push_back({time, temp});
-        query.next();
-
-    }
-    return timeTempsVec;
-
-}
 
 void Localdb::cleanDB_Min()
 {

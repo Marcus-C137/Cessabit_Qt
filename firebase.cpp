@@ -35,6 +35,7 @@ Firebase::Firebase(QObject *parent) : QObject(parent)
     chngRemote_temps                = false;
     chngRemote_notifs               = false;
     chngRemote_alms                 = false;
+    subscribed                      = false;
     db_lowTemps                     = {0.0,0.0,0.0,0.0};
     db_highTemps                    = {0.0,0.0,0.0,0.0};
     db_setTemps                     = {0.0,0.0,0.0,0.0};
@@ -48,7 +49,11 @@ Firebase::Firebase(QObject *parent) : QObject(parent)
     updateHeartbeatDoc_httpWorker   = new HttpsWorker();
     updatePortsOn_httpWorker        = new HttpsWorker();
     sendAlarm_httpWorker            = new HttpsWorker();
+    checkForUpdate_httpWorker       = new HttpsWorker();
+    downloadFirm_httpWorker         = new HttpsWorker();
+    checkSub_httpWorker             = new HttpsWorker();
     downloadDocTimer                = new QTimer(this);
+    checkForUpdateTimer             = new QTimer(this);
     connect(login_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(loginResults(QVariantMap)));
     connect(refreshLogin_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(refreshAuthResults(QVariantMap)));
     connect(readDoc_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(readDocResults(QVariantMap)));
@@ -59,10 +64,14 @@ Firebase::Firebase(QObject *parent) : QObject(parent)
     connect(updateHeartbeatDoc_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(updateHeartbeatDocResults(QVariantMap)));
     connect(updatePortsOn_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(updatePortsOnResults(QVariantMap)));
     connect(sendAlarm_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(sendAlarmResults(QVariantMap)));
+    connect(checkForUpdate_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(checkForUpdatesResults(QVariantMap)));
+    connect(checkSub_httpWorker, SIGNAL(requestFinished(QVariantMap)), this, SLOT(checkSubResults(QVariantMap)));
+    connect(downloadFirm_httpWorker, SIGNAL(requestFinishedDownloaded(QByteArray)), this, SLOT(downloadNewFirmwareResults(QByteArray)));
     connect(&Singleton<Localdb>::GetInstance(), SIGNAL(newAlarmTempFirebase(int)), this, SLOT(updateAlmsDoc(int)));
     connect(&Singleton<Localdb>::GetInstance(), SIGNAL(newPortOnVal(int, bool)), this, SLOT(updatePortsOn(int, bool)));
     connect(downloadDocTimer, SIGNAL(timeout()), this, SLOT(readDoc()));
-    downloadDocTimer->start(10000);
+    connect(checkForUpdateTimer, SIGNAL(timeout()), this, SLOT(checkForUpdates()));
+    checkForUpdateTimer->start(3600000);
 }
 
 Firebase::~Firebase()
@@ -126,7 +135,6 @@ void Firebase::loginResults(QVariantMap response)
     refreshToken = response["refreshToken"].toString();
     QString user = response["email"].toString();
 
-    qInfo() << "in Firebase::loginResults";
     //qInfo() << "LOGIN_RESULTS: ID_TOKEN: " << idToken;
     //qInfo() << "LOGIN_RESULTS: REFRESH_TOKEN: " << refreshToken;
 
@@ -173,7 +181,6 @@ void Firebase::refreshAuthResults(QVariantMap response)
         accessToken = response["access_token"].toString();
         expiresIn = response["expires_in"].toInt();
 
-        qInfo() << "in Firebase::refreshAuthResults";
         //qInfo() << "REFRESH_AUTH_RESHULTS: ID_TOKEN: " << idToken;
         //qInfo() << "REFRESH_AUTH_RESHULTS: REFRESH_TOKEN: " << refreshToken;
         //qInfo() << "REFRESH_AUTH_RESHULTS: EXPIRES_IN: " << expiresIn;
@@ -182,7 +189,7 @@ void Firebase::refreshAuthResults(QVariantMap response)
         bool success = idToken != "" && refreshToken != "" && userId != "" && expiresIn != 0;
         qInfo() << "REFRESH_AUTH_RESULTS: SUCCESS: " << success;
         if (success){
-            qInfo() << "REFRESH_AUTH_RESULTS: SETTING INTERVAL";
+            checkSub();
             QTimer::singleShot((expiresIn-10)*1000, this, &Firebase::refreshAuth);
             emit refreshedAuth();
         }
@@ -527,7 +534,7 @@ void Firebase::sendAlarm(QString title, QString message)
         QVariantMap params;
         QVariantMap header;
         QVariantMap body;
-        header["Authorization"] = "Bearer " + idToken;
+        header["Authorization"] = "Bearer " + accessToken;
         body["alarmTitle"] = title;
         body["alarmMessage"] = message;
         sendAlarm_httpWorker->post(URL, params, header, body);
@@ -541,4 +548,82 @@ void Firebase::sendAlarmResults(QVariantMap map)
 {
 
 }
+
+void Firebase::downloadNewFirmware(QString URL)
+{
+    downloadFirm_httpWorker->get(URL);
+}
+
+void Firebase::downloadNewFirmwareResults(QByteArray file)
+{
+   qInfo() << Q_FUNC_INFO << "file length: " << file.length();
+   QString versionNum = QString::number(latestVersion);
+   QString filepath = "/home/pi/Qt/Cessabit_v" + versionNum;
+   QSaveFile saveFile(filepath);
+   saveFile.open(QIODevice::WriteOnly);
+   saveFile.write(file);
+   if(saveFile.commit()){
+    QStringList chmodArgs;
+    QStringList updateArgs;
+    chmodArgs << "+x" << filepath;
+    updateArgs << "bash" << "/home/pi/writeToService.sh" << filepath;
+    p_chmod.start("chmod", chmodArgs);
+    p_serviceUpdate.start("sudo", updateArgs);
+
+  }else{
+
+   }
+}
+
+void Firebase::checkForUpdates()
+{
+   if (m_signedIn){
+       QString URL = "https://firestore.googleapis.com/v1/projects/zagermonitoringfb/databases/(default)/documents/Version/Version";
+       QVariantMap params;
+       QVariantMap header;
+       QVariantMap body;
+       header["Authorization"] = "Bearer " + accessToken;
+       checkForUpdate_httpWorker->get(URL, params, header, body);
+   }
+}
+
+void Firebase::checkForUpdatesResults(QVariantMap map)
+{
+    QString filename = QFileInfo(QCoreApplication::applicationFilePath()).fileName();
+    QString versionS = filename.split("_v")[1];
+    int currentVersion = versionS.toInt();
+    QJsonDocument jsonDoc = QJsonDocument::fromVariant(map);
+    latestVersion = jsonDoc["fields"]["version"]["integerValue"].toString().toInt();
+    QString downloadURL = jsonDoc["fields"]["downloadURL"]["stringValue"].toString();
+    qInfo() << Q_FUNC_INFO << "current version: " << currentVersion;
+    qInfo() << Q_FUNC_INFO << "latest version: " << latestVersion;
+    if (latestVersion != currentVersion){
+        //downloadNewFirmware(downloadURL);
+    }
+}
+
+void Firebase::checkSub()
+{
+    if (m_signedIn){
+        QString deviceID = wifiManager->macID;
+        QString URL = "https://firestore.googleapis.com/v1/projects/zagermonitoringfb/databases/(default)/documents/" + userId;
+        QVariantMap params;
+        QVariantMap header;
+        QVariantMap body;
+        header["Authorization"] = "Bearer " + accessToken;
+        checkSub_httpWorker->get(URL, params, header, body);
+    }
+}
+
+void Firebase::checkSubResults(QVariantMap map)
+{
+    QJsonDocument jsonDoc = QJsonDocument::fromVariant(map);
+    subscribed = jsonDoc["fields"]["Subscribed"]["booleanValue"].toBool();
+    if (subscribed){
+        readDoc();
+        downloadDocTimer->start(10000);
+    }
+}
+
+
 

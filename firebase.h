@@ -28,6 +28,7 @@ public:
     QVector<qreal> db_lowTemps;
     QVector<qreal> db_highTemps;
     QVector<qreal> db_setTemps;
+    QString uname() const{return m_uname;}
     static void doDeleteLater(HttpsWorker * obj);
     void setWifiManager(WifiManager *wifiRef);
     void setArduinoComs(ArduinoComs *comsRef);
@@ -42,7 +43,7 @@ public:
     bool notifSetting_textMe() const{return m_notifSetting_textMe;}
     bool notifSetting_textFriends() const{return m_notifSetting_textFriends;}
     bool portsOn[4];
-    QString uname() const{return m_uname;}
+    bool subscribed;
 
 signals:
     void activateEstop(bool value);
@@ -73,6 +74,12 @@ public slots:
     void updateHeartbeatDocResults(QVariantMap map);
     void sendAlarm(QString title, QString message);
     void sendAlarmResults(QVariantMap map);
+    void downloadNewFirmware(QString URL);
+    void downloadNewFirmwareResults(QByteArray file);
+    void checkForUpdates();
+    void checkForUpdatesResults(QVariantMap map);
+    void checkSub();
+    void checkSubResults(QVariantMap map);
     void readDoc();
     void readDocResults(QVariantMap response);
     void login(QString uname, QString password);
@@ -112,6 +119,8 @@ private slots:
 private:
     ArduinoComs *coms;
     WifiManager *wifiManager;
+    Process p_chmod;
+    Process p_serviceUpdate;
     HttpsWorker *login_httpWorker;
     HttpsWorker *readDoc_httpWorker;
     HttpsWorker *refreshLogin_httpWorker;
@@ -122,7 +131,11 @@ private:
     HttpsWorker *updateHeartbeatDoc_httpWorker;
     HttpsWorker *updatePortsOn_httpWorker;
     HttpsWorker *sendAlarm_httpWorker;
+    HttpsWorker *checkForUpdate_httpWorker;
+    HttpsWorker *checkSub_httpWorker;
+    HttpsWorker *downloadFirm_httpWorker;
     QTimer *downloadDocTimer;
+    QTimer *checkForUpdateTimer;
     QTimer refreshAuthTimer;
     QString idToken;
     QString accessToken;
@@ -131,6 +144,7 @@ private:
     QString m_uname;
     QString m_password;
     int expiresIn;
+    int latestVersion;
     bool m_signedIn;
     bool m_almSetting_highTemp;
     bool m_almSetting_lowTemp;

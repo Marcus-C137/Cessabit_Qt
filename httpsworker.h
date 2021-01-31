@@ -25,9 +25,11 @@ public:
 
 signals:
     void requestFinished(QVariantMap response);
+    void requestFinishedDownloaded(QByteArray file);
 
 public slots:
     void get(QString URL, QVariantMap params, QVariantMap header, QVariantMap body);
+    void get(QString URL);
     void post(QString URL, QVariantMap params, QVariantMap header, QVariantMap body);
     void patch(QString URL, QVariantMap params, QVariantMap header, QVariantMap body);
 
@@ -35,6 +37,7 @@ private slots:
     void readyRead();
     void authenticationRequired(QNetworkReply *reply, QAuthenticator *authenticator);
     void finished(QNetworkReply *reply);
+    void finishedDownload(QNetworkReply *reply);
     void networkAccessibleChanged(QNetworkAccessManager::NetworkAccessibility accessible);
 
 

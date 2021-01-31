@@ -36,7 +36,6 @@ Page {
                 text: "\u2630"
                 color: "white"
                 font.pointSize: 32
-
             }
 
             onClicked: {
@@ -57,8 +56,8 @@ Page {
             font.pointSize: 22
             color: "white"
             text: Qt.formatTime(new Date(), 'hh:mm AP')
-            anchors.left: lbl_Cessabit.right
             leftPadding: 80
+            anchors.left: lbl_Cessabit.right
             anchors.bottom: parent.bottom
         }
         Text {
@@ -66,7 +65,8 @@ Page {
             color: "#ffffff"
             text: "Cessabit"
             font.pointSize: 28
-            anchors.centerIn: parent
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
         }
 
     }
@@ -97,7 +97,7 @@ Page {
                 width: parent.width
                 onClicked: {
                     drawer.close()
-                    stack.push("connectivity.qml")
+                    if(stack.depth < 2) stack.push("connectivity.qml")
                 }
 
             }
@@ -113,7 +113,7 @@ Page {
                 width: parent.width
                 onClicked: {
                     drawer.close()
-                    stack.push("account.qml")
+                    if(stack.depth < 2)stack.push("account.qml")
                 }
             }
 
@@ -127,7 +127,7 @@ Page {
                 width: parent.width
                 onClicked: {
                     drawer.close()
-                    stack.push("Settings.qml")
+                    if(stack.depth < 2)stack.push("Settings.qml")
                 }
             }
         }
@@ -138,11 +138,8 @@ Page {
         interval: 1000
         repeat: true
         running: true
+        onTriggered: timeText.text = Qt.formatTime(new Date(), 'hh:mm AP');
 
-        onTriggered:
-        {
-            timeText.text = Qt.formatTime(new Date(), 'hh:mm AP');
-        }
     }
 
     ///////// BUTTONS /////////////////////////

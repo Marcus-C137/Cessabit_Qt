@@ -12,12 +12,15 @@ public:
     explicit ArduinoComs(QObject *parent = nullptr);
     bool sensorsConnected[4] = {true, true, true, true};
     bool sensorsWasConnected[4] = {true, true, true, true};
+    bool initialized = false;
 
 public slots:
     void getTemps();
     void setTemps(int port, int alarmLabel, qreal val);
     void setPortOn(int port, bool portOn);
     void activateEstop(bool value);
+    void loadPortsOn(QList<bool> portsOn);
+    void loadSetTemps(QVector<qreal> setTemps);
     //void startTimer();
 
 signals:
@@ -28,7 +31,6 @@ signals:
     void newTemps();
 
 private:
-    void loadTemps(QVector<QVector<qreal>> setAlms);
     QTimer *getTempsTimer;
     QTimer *setTempsTimer;
     float setTempers[4] = {79.9, 80.0, 80.1, 80.2};

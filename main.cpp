@@ -33,13 +33,13 @@ int main(int argc, char *argv[])
     ChartData cd;
     Logger::attach();
     WifiManager wifiManager;
+    ArduinoComs coms;
     Singleton<Localdb>::GetInstance();
     Singleton<Localdb>::GetInstance().checkDBs();
     Singleton<Localdb>::GetInstance().checkUserAccount();
-    Singleton<Localdb>::GetInstance().cleanDBbyMin->start(10000);
     Singleton<Localdb>::GetInstance().loadAlarmTemps();
     Singleton<Localdb>::GetInstance().loadPortsOn();
-    ArduinoComs coms;
+    Singleton<Localdb>::GetInstance().loadTemps();
     QQmlContext* context = engine.rootContext();
     Firebase firebase;
     firebase.loginViaDB();

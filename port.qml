@@ -17,10 +17,10 @@ Page {
 
     Component.onCompleted: {
         console.log("Port.qml loaded");
-        chartDataObj.loadTemps("_min");
+        chartDataObj.loadTemps(10);
         chartDataObj.loadPortOn();
+        chartDataObj.setChartLive(true);
         cv_port.animationOptions = ChartView.SeriesAnimations
-        chartDataObj
     }
 
     function toJSDate(qdate){
@@ -246,7 +246,8 @@ Page {
                 }
                 onClicked:{
                     port.timeFormat="h:mm:ss AP"
-                    chartDataObj.loadTemps("_min");
+                    chartDataObj.loadTemps(10);
+                    chartDataObj.setChartLive(true);
                     btn_txt_chartSelector_min.color ="white"
                     btn_txt_chartSelector_hour.color ="dark grey"
                     btn_txt_chartSelector_day.color ="dark grey"
@@ -269,7 +270,8 @@ Page {
                 }
                 onClicked:{
                     port.timeFormat="hh:mm AP";
-                    chartDataObj.loadTemps("_hour");
+                    chartDataObj.loadTemps(600);
+                    chartDataObj.setChartLive(false);
                     btn_txt_chartSelector_min.color ="dark grey"
                     btn_txt_chartSelector_hour.color ="white"
                     btn_txt_chartSelector_day.color ="dark grey"
@@ -292,7 +294,8 @@ Page {
                 }
                 onClicked:{
                     port.timeFormat = "h AP"
-                    chartDataObj.loadTemps("_day");
+                    chartDataObj.loadTemps(2040);
+                    chartDataObj.setChartLive(false);
                     btn_txt_chartSelector_min.color ="dark grey"
                     btn_txt_chartSelector_hour.color ="dark grey"
                     btn_txt_chartSelector_day.color ="white"
@@ -314,7 +317,8 @@ Page {
                 }
                 onClicked:{
                     port.timeFormat = "ddd dAP"
-                    chartDataObj.loadTemps("_month");
+                    chartDataObj.loadTemps(20400);
+                    chartDataObj.setChartLive(false);
                     btn_txt_chartSelector_min.color ="dark grey"
                     btn_txt_chartSelector_hour.color ="dark grey"
                     btn_txt_chartSelector_day.color ="dark grey"

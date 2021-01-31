@@ -15,7 +15,7 @@ class ChartData : public QObject
 
 public:
     explicit ChartData(QObject *parent = nullptr);
-    Q_INVOKABLE void loadTemps(QString db);
+    Q_INVOKABLE void loadTemps(int timeInterval_sec);
     Q_INVOKABLE void loadPortOn();
     Q_INVOKABLE void storeNewAlarmTemp(int alarmType, QVariant temp);
     Q_INVOKABLE void storePortOn(bool portOn);
@@ -23,12 +23,16 @@ public:
 
 public slots:
     void setTempTime(QPoint tempTime);
-    void newTempRecieved(QString db, int port, QDateTime time, qreal temp, qreal power);
+    void newTempRecieved(int port, QDateTime time, qreal temp, qreal power);
     void newAlarmTemp(int port, int alarmLabel, qreal val);
     void newPortOn(int port, bool portOn);
     void setPort(int port){
         if (m_port == port)return;
         m_port = port;
+    }
+    void setChartLive(bool live){
+        if (m_chartLive == live)return;
+        m_chartLive = live;
     }
 
 signals:
@@ -44,7 +48,7 @@ signals:
 private:
     QPoint m_tempTime;
     int m_port;
-    QString m_db;
+    bool m_chartLive;
 };
 
 #endif // CHARTDATA_H

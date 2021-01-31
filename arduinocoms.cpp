@@ -59,12 +59,14 @@ ArduinoComs::ArduinoComs(QObject *parent) : QObject(parent)
 
     close(fd);
 
+    activateEstop(false);
     getTempsTimer = new QTimer(this);
     connect(getTempsTimer, SIGNAL(timeout()), this, SLOT(getTemps()));
     getTempsTimer->start(10000);
     connect(&Singleton<Localdb>::GetInstance(), &Localdb::newAlarmTemp , this, &ArduinoComs::setTemps);
     connect(&Singleton<Localdb>::GetInstance(), &Localdb::newPortOnVal , this, &ArduinoComs::setPortOn);
-    loadTemps(Singleton<Localdb>::GetInstance().setAlms);
+    connect(&Singleton<Localdb>::GetInstance(), &Localdb::portsOnLoaded, this, &ArduinoComs::loadPortsOn);
+    connect(&Singleton<Localdb>::GetInstance(), &Localdb::setTempsLoaded, this, &ArduinoComs::loadSetTemps);
     inAlarm = false;
     alarmSent = false;
 }
@@ -119,66 +121,66 @@ void ArduinoComs::getTemps()
         for (int i = 0; i < 4; i++){
             QMetaObject::invokeMethod(&Singleton<Localdb>::GetInstance(), "addReading", Qt::AutoConnection, Q_ARG(int, i+1), Q_ARG(qreal, currentTemps[i]), Q_ARG(qreal, powerPercentage[i]));
         }
-        QString alarmTitle = "";
-        QString alarmMessage = "";
-        for(int i = 0; i<4; i++){
+        if(!initialized){
+            initialized = true;
+            for (int i=0; i<4; i++) sensorsWasConnected[i] = sensorsConnected[i];
+        }else{
+            QString alarmTitle = "";
+            QString alarmMessage = "";
             QVector<QVector<qreal>> setAlms = Singleton<Localdb>::GetInstance().setAlms;
             QList<bool> portsOn = Singleton<Localdb>::GetInstance().portsOn;
-            qreal highAlarm = setAlms[i][1];
-            qreal lowAlarm = setAlms[i][2];
-            //qInfo() << Q_FUNC_INFO << "Port " + QString::number(i) + "is at " + QString::number(currentTemps[i]) + " highAlarm = " + QString::number(highAlarm) + "  ,  lowAlarm= " + QString::number(lowAlarm);
-            if ((currentTemps[i] > highAlarm || currentTemps[i] < lowAlarm) && portsOn[i]){
-                qreal temp;
-                currentTemps[i] < 0 ? temp = 0 : temp = currentTemps[i];
-                alarmTitle = "Cessabit Alert";
-                alarmMessage += "Port " + QString::number(i+1) + " is at " + QString::number(temp) + "F \r\n";
+            for(int i = 0; i<4; i++){
+                qreal highAlarm = setAlms[i][1];
+                qreal lowAlarm = setAlms[i][2];
+                //qInfo() << Q_FUNC_INFO << "Port " + QString::number(i) + "is at " + QString::number(currentTemps[i]) + " highAlarm = " + QString::number(highAlarm) + "  ,  lowAlarm= " + QString::number(lowAlarm);
+                if ((currentTemps[i] > highAlarm || currentTemps[i] < lowAlarm) && portsOn[i] && sensorsConnected[i]){
+                    qreal temp;
+                    currentTemps[i] < 0 ? temp = 0 : temp = currentTemps[i];
+                    alarmTitle = "Cessabit Alert";
+                    alarmMessage += "Port " + QString::number(i+1) + " is at " + QString::number(temp) + "F \r\n";
+                }
+                if(sensorsWasConnected[i] && !sensorsConnected[i] && portsOn[i]){
+                    alarmTitle = "Cessabit Alert";
+                    alarmMessage += "Port " + QString::number(i+1) + " sensor has become disconnected \r\n";
+                }
+                sensorsWasConnected[i] = sensorsConnected[i];
             }
-            if(sensorsWasConnected[i] && !sensorsConnected[i] && portsOn[i]){
-                alarmTitle = "Cessabit Alert";
-                alarmMessage += "Port " + QString::number(i+1) + " sensor has become disconnected \r\n";
-            }
-            qInfo() << Q_FUNC_INFO << portsOn[i];
-            qInfo() << Q_FUNC_INFO << sensorsConnected[i];
-            qInfo() << Q_FUNC_INFO << sensorsWasConnected[i];
-            sensorsWasConnected[i] = sensorsConnected[i];
-        }
 
-        if(alarmTitle.size() > 1){
-            inAlarm = true;
-        }else{
-            inAlarm = false;
-        }
-        if (!inAlarm && alarmSent){
-            alarmSent = false; //reset alarm
-        }
-        if(inAlarm && !alarmSent){
-            alarmSent = true;
-            qInfo() << Q_FUNC_INFO << "sending firebase message " << alarmMessage;
-            emit firebaseAlarm(alarmTitle, alarmMessage);
-        }
-        tempAndPower = tempsToDisplay + powerToDisplay;
-        tempsToDisplay.append(powerToDisplay);
-        emit tempUpdate(tempsToDisplay);
-        emit powerUpdate(powerToDisplay);
-        emit firebaseUpdate(tempAndPower);
+            (alarmTitle.size() > 1) ? inAlarm = true : inAlarm = false;
+            if (!inAlarm && alarmSent) alarmSent = false; //reset alarm
+            if(inAlarm && !alarmSent){
+                alarmSent = true;
+                qInfo() << Q_FUNC_INFO << "sending firebase message " << alarmMessage;
+                emit firebaseAlarm(alarmTitle, alarmMessage);
+            }
+            tempAndPower = tempsToDisplay + powerToDisplay;
+            tempsToDisplay.append(powerToDisplay);
+            emit tempUpdate(tempsToDisplay);
+            emit powerUpdate(powerToDisplay);
+            emit firebaseUpdate(tempAndPower);
+         }
     }
 }
 
 void ArduinoComs::setTemps(int port, int alarmLabel, qreal val)
 {
-    qInfo() << Q_FUNC_INFO;
+    qInfo() << Q_FUNC_INFO << "port " << QString::number(port) << " val " << QString::number(val);
     if(alarmLabel == 0){
         int dataLength = 3;
         char buff[dataLength];
         switch(port){
         case 1:
             buff[0] = {0x00};
+            break;
         case 2:
             buff[0] = {0x01};
+            break;
         case 3:
             buff[0] = {0x02};
+            break;
         case 4:
             buff[0] = {0x03};
+            break;
         }
         int16_t setTempI = (int16_t) (val *10);
         //qInfo() << "ARDUINO COMMS: setTemps() - setTempsI = " << setTempI;
@@ -198,21 +200,30 @@ void ArduinoComs::setTemps(int port, int alarmLabel, qreal val)
 
 void ArduinoComs::setPortOn(int port, bool portOn)
 {
+    qInfo() << Q_FUNC_INFO << " port " << QString::number(port) << " port on = " << portOn;
     int dataLength = 2;
     char buff[dataLength];
     switch(port){
     case 1:
         buff[0] = {0x04};
+        break;
     case 2:
         buff[0] = {0x05};
+        break;
     case 3:
         buff[0] = {0x06};
+        break;
     case 4:
         buff[0] = {0x07};
+        break;
     }
     int8_t val;
     portOn ? val = 1 : val = 0;
     buff[1] = val;
+    QByteArray buffer;
+    buffer.append(buff[0]);
+    buffer.append(buff[1]);
+    qInfo() << Q_FUNC_INFO << " sending " << buffer.toHex();
     if (write(file_i2c, buff, dataLength) != dataLength)		//write() returns the number of bytes actually written, if it doesn't match then an error occurred (e.g. no response from the device)
     {
         /* ERROR HANDLING: i2c transaction failed */
@@ -240,13 +251,20 @@ void ArduinoComs::activateEstop(bool value)
 
 }
 
-void ArduinoComs::loadTemps(QVector<QVector<qreal> > setAlms)
+void ArduinoComs::loadPortsOn(QList<bool> portsOn)
 {
-    for (int i = 0; i < 4; i++){
-        qreal temp = setAlms[i][0];
-        setTemps(i, 0, temp);
+    for (int i = 0; i < portsOn.size(); i++){
+        setPortOn(i+1, portsOn[i]);
     }
 }
+
+void ArduinoComs::loadSetTemps(QVector<qreal> setTemperatures)
+{
+    for (int i = 0; i < 4; i++){
+        setTemps(i+1, 0, setTemperatures[i]);
+    }
+}
+
 
 
 //void ArduinoComs::startTimer()

@@ -12,6 +12,8 @@
 #include "singleton.h"
 #include "wifimanager.h"
 
+
+
 Q_DECLARE_LOGGING_CATEGORY(network);
 Q_LOGGING_CATEGORY(network, "network", QtWarningMsg);
 
@@ -19,6 +21,11 @@ Q_LOGGING_CATEGORY(network, "network", QtWarningMsg);
 
 int main(int argc, char *argv[])
 {
+    #ifdef QT_DEBUG
+     qputenv("BUILD_TYPE", QByteArray("DEBUG"));
+    #else
+     qputenv("BUILD_TYPE", QByteArray("RELEASE"));
+    #endif
 
     qputenv("QT_IM_MODULE", QByteArray("qtvirtualkeyboard"));
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
@@ -39,6 +46,7 @@ int main(int argc, char *argv[])
     Singleton<Localdb>::GetInstance().checkUserAccount();
     Singleton<Localdb>::GetInstance().loadAlarmTemps();
     Singleton<Localdb>::GetInstance().loadPortsOn();
+    Singleton<Localdb>::GetInstance().loadGains();
     Singleton<Localdb>::GetInstance().loadTemps();
     QQmlContext* context = engine.rootContext();
     Firebase firebase;

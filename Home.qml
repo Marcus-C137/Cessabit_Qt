@@ -1,6 +1,7 @@
 import QtQuick 2.12
 import QtQuick.Controls 2.5
 import QtQuick.Controls.Styles 1.4
+import QtGraphicalEffects 1.0
 
 Page {
 
@@ -17,6 +18,15 @@ Page {
             }
         }
     }
+    Connections{
+        target: firebase
+        onNotifVersion:{
+            lbl_Cessabit.text = "Cessabit v" + firebase.version
+        }
+        onNotif_newFirmwareAvailable:{
+            btn_Update.visible = newFirmwareAvailable;
+        }
+    }
 
     ///////HEADER/////////////
     Rectangle{
@@ -29,7 +39,6 @@ Page {
 
         Button {
             id: toolButton
-
             contentItem: Text {
                 /// \u25C0 = back
                 /// \u25C0 = hamburger
@@ -37,7 +46,6 @@ Page {
                 color: "white"
                 font.pointSize: 32
             }
-
             onClicked: {
                 drawer.open()
             }
@@ -48,8 +56,6 @@ Page {
             }
             anchors.leftMargin: 20
             anchors.left: parent.left
-
-
         }
         Text{
             id: timeText
@@ -63,9 +69,38 @@ Page {
         Text {
             id: lbl_Cessabit
             color: "#ffffff"
-            text: "Cessabit"
+            text: "Cessabit v" + firebase.version
             font.pointSize: 28
             anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+        }
+        Button {
+            id: btn_Update
+            contentItem: Text {
+                visible: firebase.isNewFirmwareAvailable;
+                id: txt_btn_Update
+                text: "!"
+                color: "lightblue"
+                font.pointSize: 32
+
+                ColorAnimation on color{
+                    from: "white"
+                    to: "#56a0d4"
+                    duration: 1000
+                    loops: Animation.Infinite
+                }
+            }
+
+            onClicked: {
+                popup_update.open();
+            }
+
+            background: Rectangle{
+                anchors.fill: parent
+                color: "black"
+            }
+            anchors.rightMargin: 30
+            anchors.right: parent.right
             anchors.bottom: parent.bottom
         }
 
@@ -142,6 +177,81 @@ Page {
 
     }
 
+    ///////// POP UP /////////////////////////
+
+    Popup{
+        id:popup_update
+        //x:popup_scannedNetworks.width - popup_SSIDselected.width/2
+        anchors.centerIn: parent
+        width: 600
+        height: 250
+        modal: false
+        focus: true
+        background: Rectangle{
+            anchors.fill: parent
+            color: "black"
+            border.color: "#56a0d4"
+        }
+        Text{
+            anchors.top: parent.topInset
+            anchors.topMargin: 30
+            anchors.horizontalCenter: parent.Center
+            verticalAlignment: Text.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
+            font.pointSize: 20
+            text: "There is an update available\nPress Download to update your firmware";
+            color: "white"
+        }
+        Button{
+            id: btn_close
+            anchors.left: parent.left
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 50
+            onClicked: {
+                popup_update.close();
+            }
+            contentItem: Text {
+                text: "Cancel"
+                color: "white"
+                font.pointSize: 18
+
+            }
+            background: Rectangle{
+                anchors.fill: parent
+                color: "red"
+                radius: 5
+            }
+        }
+
+        Button{
+            id: btn_ok
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.rightMargin: 50
+            onClicked: {
+                firebase.userRequestedFWDownload()
+                busyIndi.visible = true;
+            }
+            contentItem: Text {
+                text: "Download"
+                color: "white"
+                font.pointSize: 18
+            }
+            background: Rectangle{
+                anchors.fill: parent
+                color: "red"
+                radius: 5
+            }
+        }
+        BusyIndicator{
+            id: busyIndi
+            visible: false
+            running: true
+            anchors.centerIn: parent
+            width: 150
+            height: 150
+        }
+    }
     ///////// BUTTONS /////////////////////////
 
     Rectangle {

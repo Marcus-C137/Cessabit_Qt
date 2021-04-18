@@ -16,8 +16,10 @@
 class Firebase : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(bool signedIn READ signedIn WRITE setSignedIn NOTIFY signedInChanged)
-    Q_PROPERTY(QString uname READ uname);
+    Q_PROPERTY(bool signedIn                        READ signedIn                       WRITE setSignedIn                           NOTIFY signedInChanged)
+    Q_PROPERTY(QString uname                        READ uname);
+    Q_PROPERTY(QString version                      READ version                                                                    NOTIFY notifVersion);
+    Q_PROPERTY(bool isNewFirmwareAvailable          READ isNewFirmwareAvailable                                                     NOTIFY notif_newFirmwareAvailable);
     Q_PROPERTY(bool notifSetting_pushNotifications  READ notifSetting_pushNotifications WRITE setnotifSetting_pushNotifications     NOTIFY notifSetting_pushNotificationsChanged)
     Q_PROPERTY(bool notifSetting_textMe             READ notifSetting_textMe            WRITE setnotifSetting_textMe                NOTIFY notifSetting_textMeChanged)
     Q_PROPERTY(bool notifSetting_textFriends        READ notifSetting_textFriends       WRITE setnotifSetting_textFriends           NOTIFY notifSetting_textFriendsChanged)
@@ -25,14 +27,17 @@ class Firebase : public QObject
 public:
     ~Firebase();
     explicit Firebase(QObject *parent = nullptr);
+    Q_INVOKABLE void userRequestedFWDownload();
     QVector<qreal> db_lowTemps;
     QVector<qreal> db_highTemps;
     QVector<qreal> db_setTemps;
     QString uname() const{return m_uname;}
+    QString version() const{return m_version;}
     static void doDeleteLater(HttpsWorker * obj);
     void setWifiManager(WifiManager *wifiRef);
     void setArduinoComs(ArduinoComs *comsRef);
     void postCurrentTemps();
+    void loadVersionNumber();
     bool signedIn() const{return m_signedIn;}
     bool almSetting_deviceOffline() const{return m_almSetting_deviceOffline;}
     bool almSetting_highTemp() const{return m_almSetting_highTemp;}
@@ -44,15 +49,19 @@ public:
     bool notifSetting_textFriends() const{return m_notifSetting_textFriends;}
     bool portsOn[4];
     bool subscribed;
+    bool isNewFirmwareAvailable() const{return m_newFirmwareAvailable;}
 
 signals:
     void activateEstop(bool value);
     void signedInChanged(bool signedIn);
     void signInResults(bool successful);
+    void subResults(bool subscribed);
     void refreshedAuth();
+    void notifVersion(QString version);
     void notifSetting_pushNotificationsChanged(bool notifSetting_pushNotifications);
     void notifSetting_textMeChanged(bool notifSetting_textMe);
     void notifSetting_textFriendsChanged(bool notifSetting_textFriends);
+    void notif_newFirmwareAvailable(bool newFirmwareAvailable);
 
 public slots:
     void loginViaDB();
@@ -70,8 +79,12 @@ public slots:
     void updateAlmsDocResults(QVariantMap map);
     void updatePortsOn(int port, bool portOn);
     void updatePortsOnResults(QVariantMap map);
+    void updateGains(int port, int gains);
+    void updateGainsResults(QVariantMap map);
     void updateHeartbeatDoc();
     void updateHeartbeatDocResults(QVariantMap map);
+    void updateOnlineDocField();
+    void updateOnlineDocFieldResults(QVariantMap map);
     void sendAlarm(QString title, QString message);
     void sendAlarmResults(QVariantMap map);
     void downloadNewFirmware(QString URL);
@@ -129,7 +142,9 @@ private:
     HttpsWorker *updateTempsDoc_httpWorker;
     HttpsWorker *updateAlmsDoc_httpWorker;
     HttpsWorker *updateHeartbeatDoc_httpWorker;
+    HttpsWorker *updateOnlineDoc_httpWorker;
     HttpsWorker *updatePortsOn_httpWorker;
+    HttpsWorker *updateGains_httpWorker;
     HttpsWorker *sendAlarm_httpWorker;
     HttpsWorker *checkForUpdate_httpWorker;
     HttpsWorker *checkSub_httpWorker;
@@ -143,6 +158,8 @@ private:
     QString userId;
     QString m_uname;
     QString m_password;
+    QString m_version;
+    QString m_downloadURL;
     int expiresIn;
     int latestVersion;
     bool m_signedIn;
@@ -158,6 +175,7 @@ private:
     bool chngRemote_notifs;
     bool chngRemote_alms;
     bool initialDBdownloaded;
+    bool m_newFirmwareAvailable;
 
 };
 

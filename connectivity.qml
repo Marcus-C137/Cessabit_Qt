@@ -184,19 +184,22 @@ Page {
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 onClicked: {
-                    console.log("SSID: " + txt_SSIDselected.ssid + " password: " + txt_password.text);
-                    wifiManager.connectToSSID(txt_SSIDselected.ssid, txt_password.text)
-                    wifiManager.resetTimer();
-                    progressBar.value = 0;
-                    rec_newWifiLoading.visible = true
-                    animationLoadForward.start()
-                    popup_SSIDselected.close()
-                    popup_scannedNetworks.close()
+                    if (txt_password.text.length >= 8){
+                        console.log("SSID: " + txt_SSIDselected.ssid + " password: " + txt_password.text);
+                        wifiManager.connectToSSID(txt_SSIDselected.ssid, txt_password.text)
+                        wifiManager.resetTimer();
+                        progressBar.value = 0;
+                        rec_newWifiLoading.visible = true
+                        animationLoadForward.start()
+                        popup_SSIDselected.close()
+                        popup_scannedNetworks.close()
+                    }else{
+                        popup_SSIDselected.close()
+                        popup_scannedNetworks.close()
+                    }
                }
             }
         }
-
-
     }
 
     //////////////////LOADER//////////////////////////

@@ -110,7 +110,6 @@ void HttpsWorker::finished(QNetworkReply *reply)
         foreach (QByteArray rawHeader, rawHeaderList) {
           qInfo() << Q_FUNC_INFO << "QNetworkRequest rawHeader: " << _request.request.rawHeader(rawHeader);
         }
-        return;
     }
     QByteArray responseBytes = reply->readAll();
     //qInfo() << "in HttpsWorker::finished";s

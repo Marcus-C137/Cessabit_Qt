@@ -21,8 +21,17 @@ Page{
             popUpStartPage.visible = false
             if (successful){
                 txt_signedInResults.text = "Account link successfull! You have now linked your account"
+                txt_signedInInfo.text = firebase.signedIn ? "Signed in as: " + firebase.uname : "You're currently not signed in.\nDownload the app and make an account.\nOnce done, enter in your info to link your device"
             }else{
                 txt_signedInResults.text = "Error linking account. Username and password are incorrect"
+            }
+        }
+        onSubResults:{
+            busyIndi_sub.visible = false
+            if (subscribed){
+                txt_subResults.text = "You are subscribed!"
+            }else{
+                txt_subResults.text = "Currently not subscribed. Subscribe through the app under subscriptions"
             }
         }
     }
@@ -44,14 +53,12 @@ Page{
     Button {
         id: btn_SignIn
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 40
+        anchors.top: txt_signedInInfo.bottom
+        anchors.topMargin: 40
         contentItem: Text {
             text: firebase.signedIn ? "Link To A Different Account" : "Connect to an Account"
             color: "white"
             font.pointSize: 24
-
-
         }
 
         onClicked: {
@@ -66,7 +73,87 @@ Page{
 
     }
 
+    Button{
+        id:btn_ChkSub
+        visible: firebase.signedIn ? true : false
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 40
+        contentItem: Text{
+            text: "check Subscription"
+            color: "white"
+            font.pointSize: 24
+        }
+        onClicked: {
+            firebase.checkSub()
+            popUp_sub.open()
+        }
+        background: Rectangle{
+            anchors.fill: parent
+            color: Qt.rgba(0,186/255, 169/255, 1);
+            radius: 30
+        }
+    }
+
     /////////////////////POPUPS////////////////////////////
+    Popup{
+        id:popUp_sub
+        x:(parent.width-popup_enterAccountInfo.width)/2
+        y:75
+        closePolicy: Popup.NoAutoClose
+        width: 800
+        height: 300
+        modal: false
+        focus: true
+        background: Rectangle{
+            anchors.fill: parent
+            color: "black"
+            border.color: "#56a0d4"
+        }
+        onOpened:{
+            popUpSignedInPage.visible = false
+            popUp_sub.visible = true
+            busyIndi.visible = true
+        }
+        BusyIndicator{
+            id: busyIndi_sub
+            running: true
+            anchors.centerIn: parent
+            width: 150
+            height: 150
+        }
+        Text{
+            id: txt_subResults
+            anchors.centerIn: parent
+            text: "";
+            color: "white"
+            font.pointSize: 18
+        }
+        Button{
+            id: btn_popUpSub
+            width: 100
+            anchors.top: txt_subResults.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.topMargin: 50
+            anchors.leftMargin: 200
+            anchors.rightMargin: 200
+            contentItem: Text {
+                text: "Ok"
+                color: "white"
+                horizontalAlignment: Text.AlignHCenter
+                font.pointSize: 18
+            }
+            background: Rectangle{
+                anchors.fill: parent
+                color: "green"
+                radius: 5
+            }
+            onClicked: {
+                popUp_sub.close();
+            }
+        }
+    }
 
     Popup{
         id:popup_enterAccountInfo

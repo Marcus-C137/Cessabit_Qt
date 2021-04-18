@@ -82,7 +82,7 @@ Flickable {
         Label{
             id:itm_notifications
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: itm_sensorDisconnect.bottom
+            anchors.top: lbl_header.bottom
             anchors.topMargin: 60
             text: "Notifications"
             color: "white"

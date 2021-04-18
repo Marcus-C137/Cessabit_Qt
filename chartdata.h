@@ -17,8 +17,11 @@ public:
     explicit ChartData(QObject *parent = nullptr);
     Q_INVOKABLE void loadTemps(int timeInterval_sec);
     Q_INVOKABLE void loadPortOn();
+    Q_INVOKABLE void loadGain();
     Q_INVOKABLE void storeNewAlarmTemp(int alarmType, QVariant temp);
     Q_INVOKABLE void storePortOn(bool portOn);
+    Q_INVOKABLE void storeGain(int gain);
+    Q_INVOKABLE int getPort(){return m_port;};
     QPoint tempTime() const;
 
 public slots:
@@ -37,13 +40,14 @@ public slots:
 
 signals:
     void portTempRefresh(QVariantList times, QVariantList temps);
-    void portDataAdd(QDateTime time, qreal temp);
+    void portDataAdd(int time, qreal temp);
     void tempTimeChanged(QPoint tempTime);
     void setAlarmsRefresh(QVariantList temps);
     void newAlarmTempUpdate(int alarmLabel, QVariant Val);
     void portLabelRefresh(int port);
     void portPowerUpdate(qreal power);
     void portOnRefresh(bool portOn);
+    void gainRefresh(int gain);
 
 private:
     QPoint m_tempTime;

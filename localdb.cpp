@@ -32,21 +32,8 @@ Localdb::Localdb(QObject *parent) : QObject(parent)
     }
 
     cleanDBbyMin = new QTimer(this);
-
-//    cleanDBbyHour = new QTimer(this);
-//    cleanDBbyDay = new QTimer(this);
-//    cleanDBbyMonth = new QTimer(this);
-    //cleanDBbyMin->moveToThread(&DB_workerThread);
-    //DB_workerThread.start();
-    //connect(&DB_workerThread, SIGNAL(started()), this, SLOT(startTimer()));
     connect(cleanDBbyMin,SIGNAL(timeout()) , this, SLOT(cleanDB_Min()));
-//    connect(cleanDBbyHour, SIGNAL(timeout()), this, SLOT(cleanDB_Hour()));
-//    connect(cleanDBbyDay, SIGNAL(timeout()), this, SLOT(cleanDB_Day()));
-//    connect(cleanDBbyMonth, SIGNAL(timeout()), this, SLOT(cleanDB_Month()));
-    cleanDBbyMin->start(120000);
-//    cleanDBbyHour->start(2*60*60*1000);
-//    cleanDBbyDay->start(2*24*60*60*1000);
-//    cleanDBbyMonth->start(2*24*60*60*1000+2000);
+    //cleanDBbyMin->start(12000);
     setAlms.resize(4);
     setAlms[0].resize(4);
     setAlms[1].resize(4);
@@ -82,6 +69,11 @@ void Localdb::loadPortsOn(){
 
 }
 
+void Localdb::loadGains(){
+    getGains();
+    emit portGainsLoaded(portsGain);
+}
+
 void Localdb::checkDBs()
 {
     QSqlQuery query(sql_db);
@@ -94,6 +86,11 @@ void Localdb::checkDBs()
         if (!query.exec(command)){
             qWarning() << "LOCALDB: ERROR: could not create table " << tables[i];
         }
+    }
+
+    params = "(port INT, gain INT)";
+    if(!query.exec(commandPre + "gains" + params)){
+        qWarning() <<  Q_FUNC_INFO << "Could not make table gains";
     }
 
     params = "(uname TEXT, password TEXT)";
@@ -135,6 +132,17 @@ void Localdb::checkDBs()
 
         if(!query.exec(command)){qWarning() << Q_FUNC_INFO << "Could not fill table portsOn";};
     }
+    commandPre= "INSERT INTO gains(port,gain) ";
+    for (int i=1; i < 5; i++){
+        QString command = commandPre + "SELECT " + QString::number(i) + ",0 "
+                                      " WHERE NOT EXISTS("
+                                      "SELECT 1 "
+                                      "FROM gains "
+                                      "WHERE port = " + QString::number(i) + ");" ;
+
+        if(!query.exec(command)){qWarning() << Q_FUNC_INFO << "Could not fill table gains";};
+    }
+
 
 
 }
@@ -165,31 +173,82 @@ void Localdb::addUserInfo(QString uname, QString password)
     qInfo() << "LOCALDB: addUserInfo()" << uname << " " << password;
 }
 
+void Localdb::alarmTempUpdate(int port, int alarmLabel, qreal val){
+    QSqlQuery query;
+    if (setAlms[port-1][alarmLabel] != val){
+        QString command= "UPDATE setAlarmTemps SET val=" + QString::number(val) + " WHERE port=" + QString::number(port) + " AND setAlarm=\"" + tempLabel[alarmLabel] + "\";" ;
+        setAlms[port-1][alarmLabel] = val;
+        qInfo() << command;
+        if(!query.exec(command)){
+           qWarning() << Q_FUNC_INFO << "Could not fill table setAlarmTemps";
+        };
+        emit newAlarmTemp(port, alarmLabel, val);
+    }
+}
+
+void Localdb::portOnUpdate(int port, bool portOn)
+{
+    if (portsOn.at(port-1) != portOn){
+        qInfo() << "portsOn.at(port-1): " << portsOn.at(port-1) << " portOn: " << portOn;
+        portsOn[port-1] = portOn;
+        QSqlQuery query;
+        QString portOnS = "";
+        portOn ? portOnS = "true" : portOnS="false";
+        QString command = "UPDATE portsOn SET portOn=" + portOnS + " WHERE port=" + QString::number(port);
+        if(!query.exec(command)){
+            qWarning() << Q_FUNC_INFO << "Could not update table PortsOn";
+        };
+        emit newPortOnVal(port, portOn);
+    }
+}
+
 void Localdb::changeAlarmTemp(int port, int alarmLabel, qreal val)
 {
     QSqlQuery query;
-    QString command= "UPDATE setAlarmTemps SET val=" + QString::number(val) + " WHERE port=" + QString::number(port) + " AND setAlarm=\"" + tempLabel[alarmLabel] + "\";" ;
-    setAlms[port-1][alarmLabel] = val;
-    qInfo() << command;
-    if(!query.exec(command)){
-        qWarning() << Q_FUNC_INFO << "Could not fill table setAlarmTemps";
-    };
-    emit newAlarmTemp(port, alarmLabel, val);
-    emit newAlarmTempFirebase(alarmLabel);
+    if (setAlms[port-1][alarmLabel] != val){
+        QString command= "UPDATE setAlarmTemps SET val=" + QString::number(val) + " WHERE port=" + QString::number(port) + " AND setAlarm=\"" + tempLabel[alarmLabel] + "\";" ;
+        setAlms[port-1][alarmLabel] = val;
+        qInfo() << command;
+        if(!query.exec(command)){
+           qWarning() << Q_FUNC_INFO << "Could not fill table setAlarmTemps";
+        };
+        emit newAlarmTemp(port, alarmLabel, val);
+        emit newAlarmTempFirebase(alarmLabel);
+    }
 }
 
 void Localdb::changePortOn(int port, bool portOn)
 {
-    QSqlQuery query;
-    QString portOnS = "";
-    portOn ? portOnS = "true" : portOnS="false";
-    QString command = "UPDATE portsOn SET portOn=" + portOnS + " WHERE port=" + QString::number(port);
-    if(!query.exec(command)){
-        qWarning() << Q_FUNC_INFO << "Could not update table PortsOn";
-    };
-    emit newPortOnVal(port, portOn);
+    if (portsOn.at(port-1) != portOn){
+        qInfo() << "portsOn.at(port-1): " << portsOn.at(port-1) << " portOn: " << portOn;
+        portsOn[port-1] = portOn;
+        QSqlQuery query;
+        QString portOnS = "";
+        portOn ? portOnS = "true" : portOnS="false";
+        QString command = "UPDATE portsOn SET portOn=" + portOnS + " WHERE port=" + QString::number(port);
+        if(!query.exec(command)){
+            qWarning() << Q_FUNC_INFO << "Could not update table PortsOn";
+        };
+        emit newPortOnVal(port, portOn);
+        emit newPortOnValFirebase(port, portOn);
+    }
 }
 
+void Localdb::changeGain(int port, int gain)
+{
+    if (portsGain.at(port-1) != gain){
+        qInfo() << "portsGain.at(port-1): " << portsGain.at(port-1) << " gain: " << gain;
+        portsGain[port-1] = gain;
+        QSqlQuery query;
+        QString portGain= QString::number(gain);
+        QString command = "UPDATE gains SET gain=" + portGain + " WHERE port=" + QString::number(port);
+        if(!query.exec(command)){
+            qWarning() << Q_FUNC_INFO << "Could not update table PortsOn";
+        };
+        emit newGainVal(port, gain);
+        emit newGainValFirebase(port, gain);
+    }
+}
 
 QList<qreal> Localdb::getAlarmTemps(int port)
 {
@@ -224,6 +283,25 @@ QList<bool> Localdb::getPortsOn()
 
     portsOn = _portsOn;
     return portsOn;
+}
+
+QList<int> Localdb::getGains()
+{
+    QList<int> _gains;
+    QSqlQuery query;
+    query.prepare("SELECT * FROM gains");
+
+    if (!query.exec()) qWarning() << Q_FUNC_INFO << query.lastError();
+    if(!query.first()) qWarning() << Q_FUNC_INFO << "NO QUERY FIRST";
+
+    for (int i = 0; i < 4; i++){
+        int gain = query.value(1).toInt();
+        _gains.append(gain);
+        query.next();
+    }
+
+    portsGain = _gains;
+    return portsGain;
 }
 
 void Localdb::loadTemps(){
@@ -298,12 +376,11 @@ void Localdb::cleanDB_Min()
         }
 
         query_min.first();
-        //qInfo() << Q_FUNC_INFO << "LOCALDB: - size of port" + port + "_min db before delete " << query_min.value(0).toString();
+        //qInfo() << Q_FUNC_INFO << "LOCALDB: - size of " + port + " db before delete " << query_min.value(0).toString();
 
         //DELETE
         int dbSize = query_min.value(0).toInt();
         query_min.finish();
-        //qInfo() << "LOCALDB: cleanDB_min() - dbSize: " << QString::number(dbSize);
 
         if (dbSize > maxDBsize){
             QSqlQuery query_del;
@@ -329,140 +406,6 @@ void Localdb::cleanDB_Min()
     }
 }
 
-void Localdb::cleanDB_Hour()
-{
-    //CHECK IF HOUR IS TOO LARGE
-    for (int i=1; i<5 ; i++){
-        QString port = "port" + QString::number(i) + "_hour";
-        QSqlQuery query_min;
-        QString command_min = "SELECT COUNT(temp) FROM " + port;
-        query_min.prepare(command_min);
-        if(!query_min.exec()) {
-            qWarning() << "LOCALDB: addTempReading() - ERROR: could not get count from " + port;
-            qWarning() << query_min.lastError().text();
-        }
-
-        query_min.first();
-        qInfo() << "LOCALDB: - size of " + port + " db before delete " << query_min.value(0).toString();
-
-        //DELETE
-        int dbSize = query_min.value(0).toInt();
-        QSqlQuery query_del;
-        if (dbSize > 6 && port == 1){
-            int delLimit = dbSize - 6;
-            QString command_del = "DELETE FROM port1_min LIMIT 10;"; //+ QString::number(delLimit) + ";";
-            query_del.prepare("DELETE FROM " + port + " WHERE time IN (SELECT time FROM " + port + "LIMIT " + QString::number(delLimit) + ")" );
-            if(!query_del.exec()) {
-                qWarning() << "LOCALDB: - could not delete from database";
-                qWarning() << query_del.lastError().text();
-            }
-        }
-
-        //Query after
-        QSqlQuery query_min2;
-        QString command_min2 = "SELECT COUNT(temp) FROM " + port;
-        query_min2.prepare(command_min2);
-        if(!query_min2.exec()) {
-            qWarning() << "LOCALDB: addTempReading() - ERROR: could not get count from " + port;
-            qWarning() << query_min2.lastError().text();
-        }
-
-        query_min2.first();
-        qInfo() << "LOCALDB: - size of " + port + " db after delete " << query_min2.value(0).toString();
-
-    }
-}
-
-void Localdb::cleanDB_Day()
-{
-    //CHECK IF DAY IS TOO LARGE
-    for (int i=1; i<5 ; i++){
-        QString port = "port" + QString::number(i) + "_day";
-        QSqlQuery query_min;
-        QString command_min = "SELECT COUNT(temp) FROM " + port;
-        query_min.prepare(command_min);
-        if(!query_min.exec()) {
-            qWarning() << "LOCALDB: addTempReading() - ERROR: could not get count from " + port;
-            qWarning() << query_min.lastError().text();
-        }
-
-        query_min.first();
-        qInfo() << "LOCALDB: - size of " + port + " db before delete " << query_min.value(0).toString();
-
-        //DELETE
-        int dbSize = query_min.value(0).toInt();
-        QSqlQuery query_del;
-        if (dbSize > 6 && port == 1){
-            int delLimit = dbSize - 6;
-            QString command_del = "DELETE FROM port1_min LIMIT 10;"; //+ QString::number(delLimit) + ";";
-            query_del.prepare("DELETE FROM " + port + " WHERE time IN (SELECT time FROM " + port + "LIMIT " + QString::number(delLimit) + ")" );
-            if(!query_del.exec()) {
-                qWarning() << "LOCALDB: - could not delete from database";
-                qWarning() << query_del.lastError().text();
-            }
-        }
-
-        //Query after
-        QSqlQuery query_min2;
-        QString command_min2 = "SELECT COUNT(temp) FROM " + port;
-        query_min2.prepare(command_min2);
-        if(!query_min2.exec()) {
-            qWarning() << "LOCALDB: addTempReading() - ERROR: could not get count from " + port;
-            qWarning() << query_min2.lastError().text();
-        }
-
-        query_min2.first();
-        qInfo() << "LOCALDB: - size of " + port + " db after delete " << query_min2.value(0).toString();
-
-
-    }
-}
-
-void Localdb::cleanDB_Month()
-{
-    //CHECK IF MONTH IS TOO LARGE
-    for (int i=1; i<5 ; i++){
-        QString port = "port" + QString::number(i) + "_month";
-        QSqlQuery query_min;
-        QString command_min = "SELECT COUNT(temp) FROM " + port;
-        query_min.prepare(command_min);
-        if(!query_min.exec()) {
-            qWarning() << "LOCALDB: addTempReading() - ERROR: could not get count from " + port;
-            qWarning() << query_min.lastError().text();
-        }
-
-        query_min.first();
-        qInfo() << "LOCALDB: - size of " + port + " db before delete " << query_min.value(0).toString();
-
-        //DELETE
-        int dbSize = query_min.value(0).toInt();
-        QSqlQuery query_del;
-        if (dbSize > 6 && port == 1){
-            int delLimit = dbSize - 6;
-            QString command_del = "DELETE FROM port1_min LIMIT 10;"; //+ QString::number(delLimit) + ";";
-            query_del.prepare("DELETE FROM " + port + " WHERE time IN (SELECT time FROM " + port + "LIMIT " + QString::number(delLimit) + ")" );
-            if(!query_del.exec()) {
-                qWarning() << "LOCALDB: - could not delete from database";
-                qWarning() << query_del.lastError().text();
-            }
-        }
-
-        //Query after
-        QSqlQuery query_min2;
-        QString command_min2 = "SELECT COUNT(temp) FROM " + port;
-        query_min2.prepare(command_min2);
-        if(!query_min2.exec()) {
-            qWarning() << "LOCALDB: addTempReading() - ERROR: could not get count from " + port;
-            qWarning() << query_min2.lastError().text();
-        }
-
-        query_min2.first();
-        qInfo() << "LOCALDB: - size of " + port + " db after delete " << query_min2.value(0).toString();
-
-
-    }
-
-}
 
 bool Localdb::testPlugin()
 {

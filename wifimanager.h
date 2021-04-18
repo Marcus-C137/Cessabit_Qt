@@ -17,8 +17,8 @@ class WifiManager : public QObject
 public:
     explicit WifiManager(QObject *parent = nullptr);
     static QNetworkAccessManager man;
-    QHostAddress getIP();
     void getWifiStrength();
+    QHostAddress getIP();
     QString macID;
 
 signals:

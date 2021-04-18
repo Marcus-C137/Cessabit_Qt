@@ -18,9 +18,11 @@ public slots:
     void getTemps();
     void setTemps(int port, int alarmLabel, qreal val);
     void setPortOn(int port, bool portOn);
+    void setGain(int port, int gain);
     void activateEstop(bool value);
     void loadPortsOn(QList<bool> portsOn);
     void loadSetTemps(QVector<qreal> setTemps);
+    void loadGains(QList<int> gains);
     //void startTimer();
 
 signals:

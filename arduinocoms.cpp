@@ -65,7 +65,9 @@ ArduinoComs::ArduinoComs(QObject *parent) : QObject(parent)
     getTempsTimer->start(10000);
     connect(&Singleton<Localdb>::GetInstance(), &Localdb::newAlarmTemp , this, &ArduinoComs::setTemps);
     connect(&Singleton<Localdb>::GetInstance(), &Localdb::newPortOnVal , this, &ArduinoComs::setPortOn);
+    connect(&Singleton<Localdb>::GetInstance(), &Localdb::newGainVal , this, &ArduinoComs::setGain);
     connect(&Singleton<Localdb>::GetInstance(), &Localdb::portsOnLoaded, this, &ArduinoComs::loadPortsOn);
+    connect(&Singleton<Localdb>::GetInstance(), &Localdb::portGainsLoaded, this, &ArduinoComs::loadGains);
     connect(&Singleton<Localdb>::GetInstance(), &Localdb::setTempsLoaded, this, &ArduinoComs::loadSetTemps);
     inAlarm = false;
     alarmSent = false;
@@ -112,6 +114,7 @@ void ArduinoComs::getTemps()
              int lowBytePos = (i*2) + 1;
              powerPercentageBuff[i-4] = (int16_t)((buff[highBytePos] << 8) | buff[lowBytePos]);
              powerPercentage[i-4] = qFabs((qreal)(powerPercentageBuff[i-4]-512)/512);
+             if (powerPercentage[i-4] < 0.02) powerPercentage[i-4] = 0.0;
              powerToDisplay.append(powerPercentage[i-4]);
              //qInfo() << "ARDUINO_COMS: i2c powerResponse response of : " << i-4 << " : " << powerPercentage[i-4];
              //qInfo() << Q_FUNC_INFO << "buff[highBytePos]: " << (int)buff[highBytePos];
@@ -132,7 +135,7 @@ void ArduinoComs::getTemps()
             for(int i = 0; i<4; i++){
                 qreal highAlarm = setAlms[i][1];
                 qreal lowAlarm = setAlms[i][2];
-                //qInfo() << Q_FUNC_INFO << "Port " + QString::number(i) + "is at " + QString::number(currentTemps[i]) + " highAlarm = " + QString::number(highAlarm) + "  ,  lowAlarm= " + QString::number(lowAlarm);
+                //qInfo() << Q_FUNC_INFO << "Port " + QString::number(i) + " is at " + QString::number(currentTemps[i]) + " highAlarm = " + QString::number(highAlarm) + "  ,  lowAlarm= " + QString::number(lowAlarm);
                 if ((currentTemps[i] > highAlarm || currentTemps[i] < lowAlarm) && portsOn[i] && sensorsConnected[i]){
                     qreal temp;
                     currentTemps[i] < 0 ? temp = 0 : temp = currentTemps[i];
@@ -186,9 +189,9 @@ void ArduinoComs::setTemps(int port, int alarmLabel, qreal val)
         //qInfo() << "ARDUINO COMMS: setTemps() - setTempsI = " << setTempI;
         buff[1] = (setTempI >> 8) & 0xff;
         buff[2] = setTempI & 0xff;
-        qInfo() << "ARDUINO COMMS: setTemps() - buff[0] = " <<  QString::number(buff[0], 16);
-        qInfo() << "ARDUINO COMMS: setTemps() - buff[1] = " <<  QString::number(buff[1], 16);
-        qInfo() << "ARDUINO COMMS: setTemps() - buff[2] = " <<  QString::number(buff[2], 16);
+//        qInfo() << "ARDUINO COMMS: setTemps() - buff[0] = " <<  QString::number(buff[0], 16);
+//        qInfo() << "ARDUINO COMMS: setTemps() - buff[1] = " <<  QString::number(buff[1], 16);
+//        qInfo() << "ARDUINO COMMS: setTemps() - buff[2] = " <<  QString::number(buff[2], 16);
 
         if (write(file_i2c, buff, dataLength) != dataLength)		//write() returns the number of bytes actually written, if it doesn't match then an error occurred (e.g. no response from the device)
         {
@@ -231,6 +234,62 @@ void ArduinoComs::setPortOn(int port, bool portOn)
     }
 }
 
+void ArduinoComs::setGain(int port, int gain)
+{
+    qInfo() << Q_FUNC_INFO << " port " << QString::number(port) << " gain = " << gain;
+    int dataLength = 3;
+    char buff[dataLength];
+    switch(port){
+    case 1:
+        buff[0] = {0x08};
+        break;
+    case 2:
+        buff[0] = {0x09};
+        break;
+    case 3:
+        buff[0] = {0x0A};
+        break;
+    case 4:
+        buff[0] = {0x0B};
+        break;
+    }
+    int16_t gainB = (int16_t) (gain);
+    //qInfo() << "ARDUINO COMMS: setTemps() - setTempsI = " << setTempI;
+    buff[1] = (gainB >> 8) & 0xff;
+    buff[2] = gainB & 0xff;
+//    qInfo() << "ARDUINO COMMS: setTemps() - buff[0] = " <<  QString::number(buff[0], 16);
+//    qInfo() << "ARDUINO COMMS: setTemps() - buff[1] = " <<  QString::number(buff[1], 16);
+//    qInfo() << "ARDUINO COMMS: setTemps() - buff[2] = " <<  QString::number(buff[2], 16);
+    if (write(file_i2c, buff, dataLength) != dataLength)		//write() returns the number of bytes actually written, if it doesn't match then an error occurred (e.g. no response from the device)
+    {
+        /* ERROR HANDLING: i2c transaction failed */
+        qInfo() << Q_FUNC_INFO << "Failed to write to the i2c bus";
+    }
+}
+
+
+
+void ArduinoComs::loadPortsOn(QList<bool> portsOn)
+{
+    for (int i = 0; i < portsOn.size(); i++){
+        setPortOn(i+1, portsOn[i]);
+    }
+}
+
+void ArduinoComs::loadSetTemps(QVector<qreal> setTemperatures)
+{
+    for (int i = 0; i < 4; i++){
+        setTemps(i+1, 0, setTemperatures[i]);
+    }
+}
+
+void ArduinoComs::loadGains(QList<int> gains)
+{
+    for (int i=0; i < gains.size(); i++){
+        setGain(i+1, gains[i]);
+    }
+}
+
 void ArduinoComs::activateEstop(bool value)
 {
     //qInfo() << Q_FUNC_INFO << "estop activated ";
@@ -249,20 +308,6 @@ void ArduinoComs::activateEstop(bool value)
     }
     close(fd);
 
-}
-
-void ArduinoComs::loadPortsOn(QList<bool> portsOn)
-{
-    for (int i = 0; i < portsOn.size(); i++){
-        setPortOn(i+1, portsOn[i]);
-    }
-}
-
-void ArduinoComs::loadSetTemps(QVector<qreal> setTemperatures)
-{
-    for (int i = 0; i < 4; i++){
-        setTemps(i+1, 0, setTemperatures[i]);
-    }
 }
 
 

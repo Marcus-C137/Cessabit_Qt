@@ -3,32 +3,33 @@ import QtQuick.Controls 2.5
 import QtCharts 2.3
 import QtQuick.VirtualKeyboard 2.1
 
-Page {
+Flickable {
     id: port
+//    anchors.left: parent.left
+//    anchors.right: parent.right
+//    anchors.top: parent.top
+//    contentWidth: parent.width
+    contentHeight: 1000
     visible: true
     property int alm_btn_pressed: 0;
     property int time_btn_pressed: 0;
     property string timeFormat: "h:mm:ss AP"
     property bool portOnLocal: true;
-    background: Rectangle{
+    Rectangle{
         anchors.fill: parent
         color: "black"
     }
 
     Component.onCompleted: {
         console.log("Port.qml loaded");
-        chartDataObj.loadTemps(10);
+        chartDataObj.loadTemps(15);
         chartDataObj.loadPortOn();
+        chartDataObj.loadGain();
         chartDataObj.setChartLive(true);
         cv_port.animationOptions = ChartView.SeriesAnimations
+
     }
 
-    function toJSDate(qdate){
-        console.log("qdate: " + qdate.getTime());
-        var dateObj = new Date(qdate.getTime());
-        console.log("dateObj " + dateObj)
-        return dateObj;
-    }
 
     Button {
         id: toolButton
@@ -57,7 +58,7 @@ Page {
     Connections{
         target: chartDataObj
         onPortPowerUpdate: {
-            txt_powerUsage.text =  " - Power: "+ (power * 100).toFixed(0) + "%";
+            txt_label.text = "Port " + chartDataObj.getPort() + " - Power Usage: "+ (power * 100).toFixed(0) + "%";
         }
 
         onPortTempRefresh: {
@@ -67,17 +68,17 @@ Page {
             var max = 0;
             console.log("times.length = " + times.length)
             for (var i=0; i < times.length; i++){
-                var jsDate = new Date(times[i].getTime());
+                var jsDate = new Date(times[i] * 1000);
                 dataSeries.append(i, temps[i]); //console.log("onPortTempRefresh: dataSeries: at i= " + i + " " + dataSeries.at(i));
                 timeStamps[i] = Qt.formatDateTime(jsDate, port.timeFormat); //console.log("onPortTempRefresh: timePrint: at i= " + i + " " + timePrint[i])
                 if (temps[i] < min) min = temps[i]
                 if (temps[i] > max) max = temps[i]
             }
-            vAxisY.min = min - 10
-            vAxisY.max = max + 10
-            //console.log("timeStamps.length = " + timeStamps.length);
+            //vAxisY.min = min - 10
+            //vAxisY.max = max + 10
+            console.log("timeStamps.length = " + timeStamps.length);
             bAxisX.categories = timeStamps; console.log("timeStamps:" +  timeStamps);
-            //console.log("bAxisX.categories.length = " + bAxisX.categories.length);
+            console.log("bAxisX.categories.length = " + bAxisX.categories.length);
         }
         onPortDataAdd:{
             //console.log("In port Data Add")
@@ -85,8 +86,9 @@ Page {
             //console.log("temp = " + temp);
             var min = 0;
             var max = 0;
-            var jsDate = new Date(time.getTime());
+            var jsDate = new Date(time*1000);
             var timePrint = Qt.formatDateTime(jsDate, port.timeFormat)
+            //console.log("timePrint " + timePrint)
             var timeStamps = [];
 
             //Add to dataSeries
@@ -109,8 +111,8 @@ Page {
             timeStamps.push(timePrint);
             //console.log("timeStamps= " + timeStamps);
 
-            vAxisY.min = min - 10
-            vAxisY.max = max + 10
+            //vAxisY.min = min - 10
+            //vAxisY.max = max + 10
             bAxisX.categories = timeStamps
             //console.log("Data Series length = " + dataSeries.count)
         }
@@ -129,7 +131,6 @@ Page {
             }
         }
         onPortLabelRefresh: {
-            txt_label.text = "Port " + port;
             switch(port){
             case 1:
                 dataSeries.color = "blue";
@@ -151,6 +152,9 @@ Page {
             portOn ? btn_portOn_background.color = "green" : btn_portOn_background.color = "red"
             portOn ? btn_portOn_txt.text = "On" : btn_portOn_txt.text = "Off"
         }
+        onGainRefresh: {
+            sld_Gain.value = gain
+        }
     }
 
         Text{
@@ -158,7 +162,7 @@ Page {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.topMargin: 18
-            text: ""
+            text: "Port " + chartDataObj.getPort() + " - Power Usage: 0%"
             color: "white"
             font.pointSize: 28
 
@@ -191,8 +195,8 @@ Page {
 
             ValueAxis {
                 id: vAxisY
-                min: 70
-                max: 100
+                min: 0
+                max: 120
                 gridVisible: false
                 color: "#ffffff"
                 labelsColor: "#ffffff"
@@ -215,10 +219,14 @@ Page {
                 axisX: bAxisX
                 axisY: vAxisY
                 capStyle: Qt.RoundCap;
-                pointsVisible: true;
-                pointLabelsColor: "green"
+                pointLabelsColor: "white"
+                //pointsVisible: true;
+                pointLabelsVisible: true;
+                pointLabelsFormat: "@yPoint"
             }
         }
+
+        /////////////// CHART SELECTORS ////////////////////
 
         Item{
             id: i_chartSelector
@@ -294,7 +302,7 @@ Page {
                 }
                 onClicked:{
                     port.timeFormat = "h AP"
-                    chartDataObj.loadTemps(2040);
+                    chartDataObj.loadTemps(14400);
                     chartDataObj.setChartLive(false);
                     btn_txt_chartSelector_min.color ="dark grey"
                     btn_txt_chartSelector_hour.color ="dark grey"
@@ -317,7 +325,7 @@ Page {
                 }
                 onClicked:{
                     port.timeFormat = "ddd dAP"
-                    chartDataObj.loadTemps(20400);
+                    chartDataObj.loadTemps(432000);
                     chartDataObj.setChartLive(false);
                     btn_txt_chartSelector_min.color ="dark grey"
                     btn_txt_chartSelector_hour.color ="dark grey"
@@ -328,6 +336,87 @@ Page {
 
         }
 
+        /////////////////// SLIDER //////////////////////////////
+        Item{
+            id: i_slider
+            height: 50
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: i_chartSelector.bottom
+            anchors.topMargin: 20
+            Timer{
+                id: tmr_slider_sendVal
+                interval: 500; repeat: false
+                onTriggered: {
+                    if (!sld_Gain.pressed){
+                        console.log("position " + sld_Gain.value);
+                        chartDataObj.storeGain(sld_Gain.value)
+                    };
+                }
+            }
+
+            Text{
+                id: txt_Gain
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                text: "Gain"
+                color: "white"
+                font.pointSize: 22
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            Slider{
+                id: sld_Gain
+                anchors.top: txt_Gain.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: 50
+                anchors.rightMargin: 50
+                from: 1
+                to: 100
+                onMoved: {
+                    tmr_slider_sendVal.running = true;
+                    //console.log("position " + sld_Gain.value);
+                }
+
+                background: Rectangle {
+                    id: rec_slider_bg
+                    x: sld_Gain.leftPadding
+                    y: sld_Gain.topPadding + sld_Gain.availableHeight / 2 - height / 2
+                    implicitWidth: 200
+                    implicitHeight: 4
+                    width: sld_Gain.availableWidth
+                    height: implicitHeight
+                    radius: 2
+                    color: "grey"
+
+                    Rectangle {
+                        id: rec_slider
+                        width: sld_Gain.visualPosition * parent.width
+                        height: parent.height
+                        radius: 2
+                        gradient: Gradient{
+                            GradientStop{position: 0.0; color: Qt.rgba(0.1, 0.0, 0.9, 1)}
+                            GradientStop{position: 1.0; color: Qt.rgba(rec_slider.width/rec_slider_bg.width, 0.0, (rec_slider_bg.width-rec_slider.width)/rec_slider_bg.width, 1)}
+                            orientation: Gradient.Horizontal;
+                        }
+                    }
+                }
+
+                handle: Rectangle {
+                    x: sld_Gain.leftPadding + sld_Gain.visualPosition * (sld_Gain.availableWidth - width)
+                    y: sld_Gain.topPadding + sld_Gain.availableHeight / 2 - height / 2
+                    implicitWidth: 26
+                    implicitHeight: 26
+                    radius: 13
+                    color: sld_Gain.pressed ? "#f0f0f0" : "#f6f6f6"
+                    border.color: "#bdbebf"
+                }
+            }
+        }
+
+
         //////////////////// Set Alarms /////////////////////////
 
         Item{
@@ -335,9 +424,10 @@ Page {
             height:50
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: i_chartSelector.bottom
+            anchors.top: i_slider.bottom
             anchors.leftMargin: 100
             anchors.rightMargin: 100
+            anchors.topMargin: 20
             Text{
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
